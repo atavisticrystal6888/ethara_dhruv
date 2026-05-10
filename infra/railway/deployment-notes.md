@@ -17,7 +17,7 @@ Important:
 - Root directory: `backend`
 - Config-as-code file: `backend/railway.json`
 - Build command: `npm run build`
-- Pre-deploy command: `npm run db:deploy`
+- Pre-deploy commands: `npm run db:deploy`, `npm run db:seed:deploy`
 - Start command: `npm run start:prod`
 - Health check path: `/api/health`
 
@@ -73,6 +73,14 @@ Run migrations from the backend service before opening the live URL:
 
 ```text
 npm run db:deploy
+```
+
+## Demo Seed Command
+
+Railway now seeds the demo accounts and sample workspace data during backend pre-deploy so the credentials shown on the login page work on the live site as well:
+
+```text
+npm run db:seed:deploy
 ```
 
 ## Rollback Notes

@@ -34,11 +34,6 @@ export function LoginPage() {
           <div className="eyebrow">TeamFlow MVP</div>
           <h1>Login</h1>
           <p>Role-based delegation, recurring work, multi-view planning, and time tracking in one assignment-ready workspace.</p>
-          <div className="demo-credentials">
-            <strong>Seeded demo access</strong>
-            <small>avery@teamflow.demo / TeamFlow2026!</small>
-            <small>maya@teamflow.demo / TeamFlow2026!</small>
-          </div>
         </div>
         <form className="auth-panel" onSubmit={handleSubmit}>
           <h2>Sign in</h2>

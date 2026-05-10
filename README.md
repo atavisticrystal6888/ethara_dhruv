@@ -153,6 +153,7 @@ Backend build/deploy:
 ```text
 npm run build
 npm run db:deploy
+npm run db:seed:deploy
 npm run start:prod
 ```
 
@@ -183,6 +184,13 @@ VITE_LIVE_URL=https://<frontend-domain>
 ```
 
 Leave `COOKIE_DOMAIN` blank unless both services share the same parent custom domain.
+
+The backend Railway deploy also seeds the demo accounts shown on the login page, so the live app includes:
+
+```text
+avery@teamflow.demo / TeamFlow2026!
+maya@teamflow.demo / TeamFlow2026!
+```
 
 Full deployment notes are in `infra/railway/deployment-notes.md`.
 

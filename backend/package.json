@@ -11,6 +11,7 @@
     "health:check": "node -e \"fetch((process.env.API_URL || 'http://localhost:3000') + '/api/health').then(r => { if (!r.ok) process.exit(1); return r.json(); }).then(console.log)\"",
     "db:migrate": "node --env-file=.env scripts/migrate.mjs",
     "db:seed": "node --env-file=.env scripts/seed.mjs",
+    "db:seed:deploy": "node scripts/seed.mjs",
     "db:deploy": "node scripts/migrate.mjs",
     "test": "vitest run",
     "test:contract": "vitest run tests/contract",
