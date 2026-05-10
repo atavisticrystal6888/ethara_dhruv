@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -p tsconfig.json && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "start": "vite preview --host 0.0.0.0 --port ${PORT:-4173}",
+    "start": "node scripts/start-preview.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "lint": "eslint ."

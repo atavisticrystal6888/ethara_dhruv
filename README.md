@@ -141,21 +141,48 @@ Create three Railway resources:
 - Backend service rooted at `backend/`.
 - Frontend service rooted at `frontend/`.
 
-Backend build/start:
+Do not deploy the repository root as a single Railway service. This project is a two-service deploy, and the repository root intentionally has no `start` script for Nixpacks to run.
+
+Each service already includes Railway config-as-code:
+
+- `backend/railway.json`
+- `frontend/railway.json`
+
+Backend build/deploy:
 
 ```text
-npm install && npm run build
-npm run db:deploy && npm run start:prod
+npm run build
+npm run db:deploy
+npm run start:prod
 ```
 
 Frontend build/start:
 
 ```text
-npm install && npm run build
+npm run build
 npm run start
 ```
 
-Set `VITE_API_BASE_URL` to the deployed backend `/api` URL and set backend `CORS_ORIGIN` to the deployed frontend URL.
+Set backend variables:
+
+```text
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+JWT_SECRET=<strong random secret>
+COOKIE_SECURE=true
+COOKIE_DOMAIN=
+COOKIE_SAME_SITE=none
+CORS_ORIGIN=https://<frontend-domain>
+NODE_ENV=production
+```
+
+Set frontend variables:
+
+```text
+VITE_API_BASE_URL=https://<backend-domain>/api
+VITE_LIVE_URL=https://<frontend-domain>
+```
+
+Leave `COOKIE_DOMAIN` blank unless both services share the same parent custom domain.
 
 Full deployment notes are in `infra/railway/deployment-notes.md`.
 

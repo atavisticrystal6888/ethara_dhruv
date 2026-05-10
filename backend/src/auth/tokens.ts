@@ -29,11 +29,13 @@ export async function verifySessionToken(token: string): Promise<SessionClaims> 
 }
 
 export function sessionCookieOptions() {
+  const cookieDomain = env.COOKIE_DOMAIN.trim();
+
   return {
     httpOnly: true,
-    sameSite: "lax" as const,
+    sameSite: env.COOKIE_SAME_SITE,
     secure: env.COOKIE_SECURE,
-    domain: env.COOKIE_DOMAIN === "localhost" ? undefined : env.COOKIE_DOMAIN,
+    domain: cookieDomain === "" || cookieDomain === "localhost" ? undefined : cookieDomain,
     path: "/",
     maxAge: 2 * 60 * 60 * 1000
   };
