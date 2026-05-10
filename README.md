@@ -185,7 +185,7 @@ VITE_LIVE_URL=https://<frontend-domain>
 
 Leave `COOKIE_DOMAIN` blank unless both services share the same parent custom domain.
 
-The backend Railway deploy also seeds the demo accounts shown on the login page, so the live app includes:
+The backend Railway deploy also seeds the demo accounts, so the live app includes:
 
 ```text
 avery@teamflow.demo / TeamFlow2026!
