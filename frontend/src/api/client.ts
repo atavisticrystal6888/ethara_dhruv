@@ -98,24 +98,64 @@ export type ApiError = {
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
+function createApiError({
+  code,
+  message,
+  fields
+}: ApiError): Error & ApiError {
+  const error = new Error(message) as Error & ApiError;
+  error.code = code;
+  error.fields = fields;
+  return error;
+}
+
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${baseUrl}${path}`, {
-    ...options,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers
-    }
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${baseUrl}${path}`, {
+      ...options,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers
+      }
+    });
+  } catch {
+    throw createApiError({
+      code: "NETWORK_ERROR",
+      message: "Unable to reach the server. Check the Railway backend URL and CORS settings.",
+      fields: undefined
+    });
+  }
 
   if (response.status === 204) {
     return undefined as T;
   }
 
-  const data = await response.json().catch(() => ({}));
+  const contentType = response.headers.get("content-type") ?? "";
+  const isJsonResponse = contentType.includes("application/json");
+  const data = isJsonResponse ? await response.json().catch(() => undefined) : undefined;
+
   if (!response.ok) {
-    const error = data.error ?? { code: "REQUEST_FAILED", message: "Request failed" };
-    throw { ...error, fields: data.fields } satisfies ApiError;
+    const error = typeof data === "object" && data !== null && "error" in data
+      ? ((data as { error?: ApiError }).error ?? { code: "REQUEST_FAILED", message: "Request failed" })
+      : { code: "REQUEST_FAILED", message: "Request failed" };
+
+    throw createApiError({
+      ...error,
+      fields: typeof data === "object" && data !== null && "fields" in data
+        ? (data as { fields?: Array<{ path: string; message: string }> }).fields
+        : undefined
+    });
+  }
+
+  if (!isJsonResponse) {
+    throw createApiError({
+      code: "INVALID_RESPONSE",
+      message: "Unexpected response from server. Verify the frontend API URL points to the backend /api endpoint.",
+      fields: undefined
+    });
   }
 
   return data as T;

@@ -699,9 +699,24 @@ small,
 .auth-panel {
   width: 100%;
   background: var(--surface-strong);
+  color: #17324a;
   display: grid;
   gap: 14px;
   align-content: start;
+}
+
+.auth-panel h2,
+.auth-panel .form-field,
+.auth-panel a {
+  color: #17324a;
+}
+
+.auth-panel a {
+  font-weight: 700;
+}
+
+.auth-panel .input::placeholder {
+  color: #708295;
 }
 
 .demo-credentials {
