@@ -14,8 +14,8 @@ Build a full-stack Team Task Manager as a React single-page frontend backed by a
 **Language/Version**: TypeScript 5.x on Node.js 20 LTS  
 **Frontend**: React 18 + Vite + React Router + TanStack Query  
 **Backend**: Express 5 REST API with layered route, service, validation, and authorization modules  
-**Primary Dependencies**: Prisma ORM, Zod validation, bcrypt password hashing, jose for signed auth tokens, cookie-parser, helmet, cors, pino logging, lucide-react for icons  
-**Storage**: PostgreSQL on Railway, accessed through Prisma migrations and generated client  
+**Primary Dependencies**: `pg`, Zod validation, bcrypt password hashing, jose for signed auth tokens, cookie-parser, helmet, cors, pino logging, lucide-react for icons  
+**Storage**: PostgreSQL on Railway, accessed through versioned SQL migrations and a thin database adapter layer  
 **Authentication**: Email/password login with secure HTTP-only cookie carrying a signed short-lived access token; password reset and third-party auth are out of scope for v1  
 **Testing**: Vitest for unit tests, Supertest for REST contract/integration tests, Playwright for critical end-to-end and responsive smoke tests  
 **Deployment Target**: Railway with three resources: a backend Express API service, a frontend Vite static web service, and Railway PostgreSQL  
@@ -55,8 +55,7 @@ specs/001-team-task-manager/
 ```text
 backend/
 ├── package.json
-├── prisma/
-│   ├── schema.prisma
+├── db/
 │   └── migrations/
 ├── src/
 │   ├── api/
@@ -79,7 +78,7 @@ backend/
 │   │   ├── env.ts
 │   │   └── logger.ts
 │   ├── models/
-│   │   └── prisma.ts
+│   │   └── database.ts
 │   ├── services/
 │   │   ├── auth.service.ts
 │   │   ├── dashboard.service.ts
@@ -144,11 +143,11 @@ scripts/
 README.md
 ```
 
-**Structure Decision**: Use a two-package `backend/` and `frontend/` layout to keep REST API, Prisma migrations, and frontend UI concerns separated while remaining simple enough for a single Railway-backed assignment. `infra/railway/` stores deployment notes and smoke-test evidence, while public deliverables stay in `README.md`.
+**Structure Decision**: Use a two-package `backend/` and `frontend/` layout to keep REST API, SQL migration, and frontend UI concerns separated while remaining simple enough for a single Railway-backed assignment. `infra/railway/` stores deployment notes and smoke-test evidence, while public deliverables stay in `README.md`.
 
 ## Phase 0: Research Summary
 
-Research decisions are captured in [research.md](research.md). The resolved choices are TypeScript across the stack, React/Vite for frontend, Express REST for backend, PostgreSQL with Prisma for storage, cookie-based signed auth, and Railway PostgreSQL deployment.
+Research decisions are captured in [research.md](research.md). The resolved choices are TypeScript across the stack, React/Vite for frontend, Express REST for backend, PostgreSQL with direct `pg` access for storage, cookie-based signed auth, and Railway PostgreSQL deployment.
 
 ## Phase 1: Design Summary
 

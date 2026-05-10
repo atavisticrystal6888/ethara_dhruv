@@ -1,12 +1,12 @@
 # Team Task Manager
 
-Team Task Manager is a full-stack assignment app with a React/Vite frontend, Express REST API, Prisma data access, and PostgreSQL persistence. It supports secure signup/login, first-user Admin bootstrap, Admin/Member role enforcement, project membership, task assignment, status tracking, dashboard summaries, and Railway deployment evidence.
+Team Task Manager is a full-stack assignment app with a React/Vite frontend, Express REST API, direct PostgreSQL access through `pg`, and SQL-backed schema migrations. It supports secure signup/login, first-user Admin bootstrap, Admin/Member role enforcement, project membership, task assignment, status tracking, dashboard summaries, and Railway deployment evidence.
 
 ## Overview
 
 - Frontend: React 18, Vite, React Router, TanStack Query.
 - Backend: Express 5, TypeScript, Zod validation, HTTP-only signed cookie auth with `jose`.
-- Database: PostgreSQL through Prisma migrations.
+- Database: PostgreSQL through versioned SQL migrations.
 - Deployment: Railway backend service, Railway frontend service, Railway PostgreSQL.
 
 ## Local Setup
@@ -20,20 +20,34 @@ Prerequisites:
 Install and run the backend:
 
 ```text
+cp backend/.env.example backend/.env
 cd backend
 npm install
-cp .env.example .env
-npm run prisma:generate
-npm run prisma:migrate
-npm run dev
+npm run db:migrate
 ```
 
 Install and run the frontend:
 
 ```text
+cp frontend/.env.example frontend/.env
 cd frontend
 npm install
-cp .env.example .env
+```
+
+Or run both apps together from the FSWA root:
+
+```text
+npm install
+npm run db:migrate --workspace backend
+npm run dev
+```
+
+Install and run the backend only:
+
+```text
+cd backend
+npm install
+npm run db:migrate
 npm run dev
 ```
 
@@ -62,18 +76,20 @@ VITE_LIVE_URL=https://your-frontend.up.railway.app
 
 ## Database
 
-The Prisma schema is in `backend/prisma/schema.prisma`. Run local migrations with:
+SQL migrations live in `backend/db/migrations/`, and the migration runner lives in `backend/scripts/migrate.mjs`.
+
+Run local migrations with:
 
 ```text
 cd backend
-npm run prisma:migrate
+npm run db:migrate
 ```
 
 Run production migrations on Railway with:
 
 ```text
 cd backend
-npm run prisma:deploy
+npm run db:deploy
 ```
 
 ## Tests
@@ -102,8 +118,8 @@ Create three Railway resources:
 Backend build/start:
 
 ```text
-npm install && npm run prisma:generate && npm run build
-npm run prisma:deploy && npm run start:prod
+npm install && npm run build
+npm run db:deploy && npm run start:prod
 ```
 
 Frontend build/start:

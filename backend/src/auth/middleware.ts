@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { ApiError } from "../api/middleware/error.js";
-import { prisma } from "../models/prisma.js";
+import { database } from "../models/database.js";
 import type { Role } from "../types/domain.js";
 import { sessionCookieName, verifySessionToken } from "./tokens.js";
 
@@ -28,7 +28,7 @@ export async function authenticate(request: Request, _response: Response, next: 
     }
 
     const claims = await verifySessionToken(token);
-    const user = (await prisma.user.findUnique({
+    const user = (await database.user.findUnique({
       where: { id: claims.sub },
       select: { id: true, name: true, email: true, role: true, createdAt: true }
     })) as AuthenticatedUser | null;

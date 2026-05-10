@@ -4,12 +4,13 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    fileParallelism: false,
     testTimeout: 20000,
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/**/*.test.ts"],
     coverage: {
       reporter: ["text", "html"],
-      exclude: ["dist/**", "prisma/**"]
+      exclude: ["dist/**"]
     }
   }
 });

@@ -18,11 +18,11 @@
 
 **Alternatives considered**: NestJS offers stronger structure but adds framework overhead. Fastify is performant but less familiar to many reviewers. Serverless functions complicate RBAC and database connection handling for a small assignment.
 
-## Decision: Use PostgreSQL with Prisma
+## Decision: Use PostgreSQL with direct `pg` access and SQL migrations
 
-**Rationale**: The domain is relationship-heavy: users, projects, memberships, task assignees, task creators, statuses, and dashboard counts. PostgreSQL enforces relational integrity, and Railway has first-class PostgreSQL support. Prisma migrations and generated types make schema evolution and local setup reproducible.
+**Rationale**: The domain is relationship-heavy: users, projects, memberships, task assignees, task creators, statuses, and dashboard counts. PostgreSQL enforces relational integrity, Railway has first-class PostgreSQL support, and plain SQL migrations keep schema changes explicit. A thin `pg`-backed adapter keeps the service layer simple without depending on generated client tooling.
 
-**Alternatives considered**: MongoDB can satisfy NoSQL persistence but would require more custom relationship enforcement. SQLite is excellent locally but not the best fit for mandatory Railway production deployment. Raw SQL avoids ORM abstraction but slows development and increases boilerplate.
+**Alternatives considered**: MongoDB can satisfy NoSQL persistence but would require more custom relationship enforcement. SQLite is excellent locally but not the best fit for mandatory Railway production deployment. Prisma was viable, but its generated-client and engine tooling added avoidable operational complexity for this assignment.
 
 ## Decision: Use secure HTTP-only cookie authentication with signed tokens
 
@@ -40,7 +40,7 @@
 
 **Rationale**: Zod produces explicit request schemas, field-specific validation errors, and reusable TypeScript types. This directly supports the rubric items for validations, error states, and REST error consistency.
 
-**Alternatives considered**: Manual validation is error-prone. Joi is mature but less TypeScript-native. Prisma validation alone cannot produce user-friendly API validation responses for every input case.
+**Alternatives considered**: Manual validation is error-prone. Joi is mature but less TypeScript-native. Database constraints alone cannot produce user-friendly API validation responses for every input case.
 
 ## Decision: Use Vitest, Supertest, and Playwright for evidence-based delivery
 

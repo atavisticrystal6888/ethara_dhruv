@@ -2,15 +2,16 @@
   "name": "fswa-team-task-manager",
   "private": true,
   "version": "0.1.0",
-  "description": "Full-stack Team Task Manager assignment with React, Express, Prisma, PostgreSQL, and Railway deployment notes.",
+  "description": "Full-stack Team Task Manager assignment with React, Express, PostgreSQL, SQL migrations, and Railway deployment notes.",
   "workspaces": [
     "backend",
     "frontend"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace backend",
+    "dev": "node scripts/dev.mjs",
     "dev:backend": "npm run dev --workspace backend",
     "dev:frontend": "npm run dev --workspace frontend",
+    "db:seed": "npm run db:seed --workspace backend",
     "build": "npm run build --workspace backend && npm run build --workspace frontend",
     "test": "npm run test --workspace backend && npm run test --workspace frontend",
     "test:e2e": "npm run test:e2e --workspace frontend",

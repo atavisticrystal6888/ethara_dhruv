@@ -1,34 +1,79 @@
-import type { Task, TaskStatus } from "../../api/client";
+import { Clock3, Play, Square } from "lucide-react";
+import type { ProjectRole, Task, TaskStatus } from "../../api/client";
 import { Button } from "../ui/Button";
 import { StatusBadge } from "./StatusBadge";
 
+function formatHours(minutes: number) {
+  const hours = minutes / 60;
+  return `${hours % 1 === 0 ? hours.toFixed(0) : hours.toFixed(1)}h`;
+}
+
+function formatDueDate(value: string) {
+  return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 export function TaskList({
   tasks,
-  canDelete,
+  canManage,
+  currentUserId,
+  currentProjectRole,
   onStatusChange,
+  onTimerAction,
+  onLogTime,
   onDelete
 }: {
   tasks: Task[];
-  canDelete: boolean;
+  canManage: boolean;
+  currentUserId?: string;
+  currentProjectRole?: ProjectRole | null;
   onStatusChange: (taskId: string, status: TaskStatus) => Promise<unknown>;
+  onTimerAction: (taskId: string, action: "START" | "STOP") => Promise<unknown>;
+  onLogTime: (taskId: string, minutes: number) => Promise<unknown>;
   onDelete: (taskId: string) => Promise<unknown>;
 }) {
+  const canOperateTask = (task: Task) =>
+    canManage || task.assignee?.id === currentUserId || (task.assignmentType === "ROLE" && task.assigneeRole === currentProjectRole);
+
   return (
-    <div className="list">
+    <div className="task-list-grid">
       {tasks.map((task) => (
-        <article className="task-row" key={task.id}>
-          <div>
-            <h3>{task.title}</h3>
-            <p>{task.description}</p>
-            <small>{task.assignee.name} · due {task.dueDate}</small>
+        <article className="task-card task-row" key={task.id}>
+          <div className="task-card-head">
+            <div>
+              <h3>{task.title}</h3>
+              <p>{task.description}</p>
+            </div>
+            <div className="task-card-badges">
+              <StatusBadge status={task.status} overdue={task.isOverdue} />
+              {task.recurrencePattern !== "NONE" ? <span className="mini-pill">{task.recurrencePattern}</span> : null}
+            </div>
           </div>
-          <StatusBadge status={task.status} overdue={task.isOverdue} />
-          <select className="input compact" value={task.status} onChange={(event) => void onStatusChange(task.id, event.target.value as TaskStatus)}>
-            <option value="TODO">To Do</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="DONE">Done</option>
-          </select>
-          {canDelete ? <Button variant="danger" onClick={() => void onDelete(task.id)}>Delete</Button> : null}
+          <div className="task-meta-row">
+            <span>{task.assignmentLabel}</span>
+            <span>Due {formatDueDate(task.dueDate)}</span>
+            <span>{formatHours(task.trackedMinutes)} tracked / {formatHours(task.estimatedMinutes)} planned</span>
+            {task.timerStartedAt ? <span>Timer live</span> : null}
+          </div>
+          <div className="task-actions">
+            <select className="input compact" value={task.status} disabled={!canOperateTask(task)} onChange={(event) => void onStatusChange(task.id, event.target.value as TaskStatus)}>
+              <option value="TODO">To Do</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="DONE">Done</option>
+            </select>
+            <Button
+              variant="secondary"
+              type="button"
+              disabled={task.timerStartedAt ? !canManage && task.timerUserId !== currentUserId : !canOperateTask(task)}
+              onClick={() => void onTimerAction(task.id, task.timerStartedAt ? "STOP" : "START")}
+            >
+              {task.timerStartedAt ? <Square size={16} /> : <Play size={16} />}
+              {task.timerStartedAt ? "Stop timer" : "Start timer"}
+            </Button>
+            <Button variant="secondary" type="button" disabled={!canOperateTask(task)} onClick={() => void onLogTime(task.id, 15)}>
+              <Clock3 size={16} /> +15 min
+            </Button>
+            {canManage ? <Button variant="danger" type="button" onClick={() => void onDelete(task.id)}>Delete</Button> : null}
+          </div>
         </article>
       ))}
     </div>

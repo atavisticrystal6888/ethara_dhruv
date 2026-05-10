@@ -9,8 +9,8 @@
 ## Backend Service
 
 - Root directory: `backend`
-- Build command: `npm install && npm run prisma:generate && npm run build`
-- Start command: `npm run prisma:deploy && npm run start:prod`
+- Build command: `npm install && npm run build`
+- Start command: `npm run db:deploy && npm run start:prod`
 - Health check path: `/api/health`
 
 Required variables:
@@ -44,7 +44,7 @@ PORT=${{PORT}}
 Run migrations from the backend service before opening the live URL:
 
 ```text
-npm run prisma:deploy
+npm run db:deploy
 ```
 
 ## Rollback Notes

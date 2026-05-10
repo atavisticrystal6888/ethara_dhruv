@@ -30,21 +30,33 @@ export function SignupPage() {
 
   return (
     <main className="auth-page">
-      <form className="auth-panel" onSubmit={handleSubmit}>
-        <h1>Sign up</h1>
-        {error ? <ErrorAlert message={error} /> : null}
-        <FormField label="Name">
-          <TextInput value={name} onChange={(event) => setName(event.target.value)} minLength={2} required />
-        </FormField>
-        <FormField label="Email">
-          <TextInput type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-        </FormField>
-        <FormField label="Password">
-          <TextInput type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} required />
-        </FormField>
-        <Button disabled={submitting}>{submitting ? "Creating" : "Create account"}</Button>
-        <Link to="/login">Use existing account</Link>
-      </form>
+      <section className="auth-layout">
+        <div className="auth-showcase">
+          <div className="eyebrow">Launch a workspace</div>
+          <h1>Sign up</h1>
+          <p>The first account becomes the platform admin. Every new project you create makes you its initial owner.</p>
+          <div className="demo-credentials">
+            <strong>What’s included</strong>
+            <small>Project roles for owners, managers, and members</small>
+            <small>Kanban, timeline, calendar, recurring work, and timers</small>
+          </div>
+        </div>
+        <form className="auth-panel" onSubmit={handleSubmit}>
+          <h2>Create account</h2>
+          {error ? <ErrorAlert message={error} /> : null}
+          <FormField label="Name">
+            <TextInput value={name} onChange={(event) => setName(event.target.value)} minLength={2} required />
+          </FormField>
+          <FormField label="Email">
+            <TextInput type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+          </FormField>
+          <FormField label="Password">
+            <TextInput type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} required />
+          </FormField>
+          <Button disabled={submitting}>{submitting ? "Creating" : "Create account"}</Button>
+          <Link to="/login">Use existing account</Link>
+        </form>
+      </section>
     </main>
   );
 }

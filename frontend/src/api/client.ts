@@ -1,5 +1,8 @@
 export type Role = "ADMIN" | "MEMBER";
+export type ProjectRole = "OWNER" | "MANAGER" | "MEMBER";
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE";
+export type TaskAssignmentType = "USER" | "ROLE";
+export type RecurrencePattern = "NONE" | "DAILY" | "WEEKLY" | "MONTHLY";
 
 export type User = {
   id: string;
@@ -12,6 +15,7 @@ export type User = {
 export type Membership = {
   id: string;
   projectId: string;
+  role: ProjectRole;
   user: User;
   createdAt: string;
 };
@@ -22,9 +26,18 @@ export type Task = {
   title: string;
   description: string | null;
   status: TaskStatus;
-  assignee: User;
+  assignmentType: TaskAssignmentType;
+  assignee: User | null;
+  assigneeRole: ProjectRole | null;
+  assignmentLabel: string;
   createdBy: User;
   dueDate: string;
+  estimatedMinutes: number;
+  trackedMinutes: number;
+  timerStartedAt: string | null;
+  timerUserId: string | null;
+  recurrencePattern: RecurrencePattern;
+  recurrenceParentTaskId: string | null;
   isOverdue: boolean;
   createdAt: string;
   updatedAt: string;
@@ -51,6 +64,18 @@ export type DashboardSummary = {
   assignedTasks: number;
   statusTotals: Record<TaskStatus, number>;
   overdueTasks: number;
+  estimatedMinutesTotal: number;
+  trackedMinutesTotal: number;
+  activeTimerCount: number;
+  recurringTaskCount: number;
+  completionRate: number;
+  memberWorkload: Array<{
+    userId: string;
+    name: string;
+    assignedTasks: number;
+    completedTasks: number;
+    trackedMinutes: number;
+  }>;
   projectSummaries: Array<{
     projectId: string;
     projectName: string;
@@ -58,6 +83,10 @@ export type DashboardSummary = {
     statusTotals: Record<TaskStatus, number>;
     overdueTasks: number;
     progressPercent: number;
+    estimatedMinutes: number;
+    trackedMinutes: number;
+    recurringTaskCount: number;
+    activeTimerCount: number;
   }>;
 };
 
@@ -104,13 +133,44 @@ export const api = {
   createProject: (body: { name: string; description?: string }) =>
     apiRequest<Project>("/projects", { method: "POST", body: JSON.stringify(body) }),
   getProject: (projectId: string) => apiRequest<Project>(`/projects/${projectId}`),
-  addMembership: (projectId: string, userId: string) =>
-    apiRequest<Membership>(`/projects/${projectId}/memberships`, { method: "POST", body: JSON.stringify({ userId }) }),
+  addMembership: (projectId: string, userId: string, role: ProjectRole) =>
+    apiRequest<Membership>(`/projects/${projectId}/memberships`, { method: "POST", body: JSON.stringify({ userId, role }) }),
+  updateMembership: (projectId: string, userId: string, role: ProjectRole) =>
+    apiRequest<Membership>(`/projects/${projectId}/memberships/${userId}`, { method: "PATCH", body: JSON.stringify({ role }) }),
   removeMembership: (projectId: string, userId: string) =>
     apiRequest<void>(`/projects/${projectId}/memberships/${userId}`, { method: "DELETE" }),
-  createTask: (projectId: string, body: { title: string; description?: string; status: TaskStatus; assigneeId: string; dueDate: string }) =>
+  createTask: (
+    projectId: string,
+    body: {
+      title: string;
+      description?: string;
+      status: TaskStatus;
+      assignmentType: TaskAssignmentType;
+      assigneeId?: string;
+      assigneeRole?: ProjectRole;
+      dueDate: string;
+      estimatedMinutes: number;
+      recurrencePattern: RecurrencePattern;
+    }
+  ) =>
     apiRequest<Task>(`/projects/${projectId}/tasks`, { method: "POST", body: JSON.stringify(body) }),
-  updateTask: (projectId: string, taskId: string, body: Partial<{ title: string; description: string; status: TaskStatus; assigneeId: string; dueDate: string }>) =>
+  updateTask: (
+    projectId: string,
+    taskId: string,
+    body: Partial<{
+      title: string;
+      description: string;
+      status: TaskStatus;
+      assignmentType: TaskAssignmentType;
+      assigneeId: string;
+      assigneeRole: ProjectRole;
+      dueDate: string;
+      estimatedMinutes: number;
+      trackedMinutesDelta: number;
+      timerAction: "START" | "STOP";
+      recurrencePattern: RecurrencePattern;
+    }>
+  ) =>
     apiRequest<Task>(`/projects/${projectId}/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteTask: (projectId: string, taskId: string) => apiRequest<void>(`/projects/${projectId}/tasks/${taskId}`, { method: "DELETE" }),
   dashboard: () => apiRequest<DashboardSummary>("/dashboard")

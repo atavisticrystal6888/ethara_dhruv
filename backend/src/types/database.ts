@@ -1,4 +1,4 @@
-import type { Role, TaskStatus } from "./domain.js";
+import type { ProjectRole, RecurrencePattern, Role, TaskAssignmentType, TaskStatus } from "./domain.js";
 
 type QueryArgs = Record<string, unknown>;
 
@@ -46,6 +46,7 @@ export type DbMembership = {
   id: string;
   projectId: string;
   userId: string;
+  role: ProjectRole;
   createdAt: Date;
 };
 
@@ -55,9 +56,17 @@ export type DbTask = {
   title: string;
   description: string | null;
   status: TaskStatus;
-  assigneeId: string;
+  assignmentType: TaskAssignmentType;
+  assigneeId: string | null;
+  assigneeRole: ProjectRole | null;
   createdById: string;
   dueDate: Date;
+  estimatedMinutes: number;
+  trackedMinutes: number;
+  timerStartedAt: Date | null;
+  timerUserId: string | null;
+  recurrencePattern: RecurrencePattern;
+  recurrenceParentTaskId: string | null;
   createdAt: Date;
   updatedAt: Date;
 };

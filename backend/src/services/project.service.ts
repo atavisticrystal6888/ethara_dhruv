@@ -1,6 +1,6 @@
 import type { AuthenticatedUser } from "../auth/middleware.js";
-import { requireAdmin, requireProjectAccess, requireProjectAdmin } from "../auth/permissions.js";
-import { prisma } from "../models/prisma.js";
+import { requireProjectAccess, requireProjectAdmin } from "../auth/permissions.js";
+import { database } from "../models/database.js";
 import type { ProjectCreateInput, ProjectUpdateInput } from "../validations/project.schemas.js";
 import { serializeProject, serializeProjectSummary } from "./serializers.js";
 import type { ProjectDetailRecord, ProjectSummaryRecord } from "./serializers.js";
@@ -22,7 +22,7 @@ const projectInclude = {
 };
 
 export async function listProjects(user: AuthenticatedUser) {
-  const projects = (await prisma.project.findMany({
+  const projects = (await database.project.findMany({
     where: user.role === "ADMIN" ? undefined : { memberships: { some: { userId: user.id } } },
     include: { _count: { select: { memberships: true, tasks: true } } },
     orderBy: { createdAt: "desc" }
@@ -31,14 +31,13 @@ export async function listProjects(user: AuthenticatedUser) {
 }
 
 export async function createProject(user: AuthenticatedUser, input: ProjectCreateInput) {
-  requireAdmin(user);
-  const project = (await prisma.project.create({
+  const project = (await database.project.create({
     data: {
       name: input.name,
       description: input.description || null,
       createdById: user.id,
       memberships: {
-        create: { userId: user.id }
+        create: { userId: user.id, role: "OWNER" }
       }
     },
     include: projectInclude
@@ -48,13 +47,13 @@ export async function createProject(user: AuthenticatedUser, input: ProjectCreat
 
 export async function getProject(user: AuthenticatedUser, projectId: string) {
   await requireProjectAccess(user, projectId);
-  const project = (await prisma.project.findUniqueOrThrow({ where: { id: projectId }, include: projectInclude })) as ProjectDetailRecord;
+  const project = (await database.project.findUniqueOrThrow({ where: { id: projectId }, include: projectInclude })) as ProjectDetailRecord;
   return serializeProject(project);
 }
 
 export async function updateProject(user: AuthenticatedUser, projectId: string, input: ProjectUpdateInput) {
   await requireProjectAdmin(user, projectId);
-  const project = (await prisma.project.update({
+  const project = (await database.project.update({
     where: { id: projectId },
     data: {
       name: input.name,
@@ -67,5 +66,5 @@ export async function updateProject(user: AuthenticatedUser, projectId: string, 
 
 export async function deleteProject(user: AuthenticatedUser, projectId: string) {
   await requireProjectAdmin(user, projectId);
-  await prisma.project.delete({ where: { id: projectId } });
+  await database.project.delete({ where: { id: projectId } });
 }

@@ -20,11 +20,21 @@ describe("first Admin bootstrap and RBAC", () => {
     expect(member.body.user.role).toBe("MEMBER");
   });
 
-  it("denies Admin-only project actions for Members", async () => {
+  it("lets project owners manage collaborators through project-scoped roles", async () => {
     await request(app).post("/api/auth/signup").send({ name: "Admin", email: "admin@example.com", password: "Secret123" }).expect(201);
     const memberAgent = request.agent(app);
     await memberAgent.post("/api/auth/signup").send({ name: "Member", email: "member@example.com", password: "Secret123" }).expect(201);
+    const collaborator = await request(app).post("/api/auth/signup").send({ name: "Collaborator", email: "collaborator@example.com", password: "Secret123" }).expect(201);
 
-    await memberAgent.post("/api/projects").send({ name: "Member Project" }).expect(403);
+    const project = await memberAgent.post("/api/projects").send({ name: "Member Project" }).expect(201);
+
+    const membership = await memberAgent
+      .post(`/api/projects/${project.body.id}/memberships`)
+      .send({ userId: collaborator.body.user.id, role: "MANAGER" })
+      .expect(201);
+
+    expect(membership.body.role).toBe("MANAGER");
+
+    await memberAgent.patch(`/api/projects/${project.body.id}/memberships/${collaborator.body.user.id}`).send({ role: "MEMBER" }).expect(200);
   });
 });

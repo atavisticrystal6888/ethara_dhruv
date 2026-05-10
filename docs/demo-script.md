@@ -5,7 +5,7 @@ Target length: 2 to 5 minutes.
 ## Opening
 
 - Show the live Railway frontend URL.
-- State that the app is backed by an Express REST API, Prisma, and Railway PostgreSQL.
+- State that the app is backed by an Express REST API, direct PostgreSQL access via `pg`, and Railway PostgreSQL.
 
 ## Authentication And Roles
 

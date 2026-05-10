@@ -36,9 +36,9 @@ description: "Tasks for Team Task Manager implementation"
 
 **CRITICAL**: No user story work can begin until this phase is complete.
 
-- [X] T007 Define Prisma schema for User, Project, Membership, Task, role, and status models in backend/prisma/schema.prisma
-- [X] T008 Create initial database migration for users, projects, memberships, tasks, constraints, and indexes in backend/prisma/migrations/001_init/migration.sql
-- [X] T009 [P] Implement Prisma client singleton in backend/src/models/prisma.ts
+- [X] T007 Define the relational database schema for User, Project, Membership, Task, role, and status models
+- [X] T008 Create the initial SQL migration for users, projects, memberships, tasks, constraints, and indexes in backend/db/migrations/001_init.sql
+- [X] T009 [P] Implement the shared database client singleton in backend/src/models/database.ts
 - [X] T010 [P] Implement environment validation and runtime config in backend/src/config/env.ts
 - [X] T011 [P] Implement shared API error, not-found, and Zod validation middleware in backend/src/api/middleware/error.ts and backend/src/api/middleware/validate.ts
 - [X] T012 Wire Express app, JSON parsing, security middleware, CORS, cookies, and route mounting in backend/src/app.ts and backend/src/server.ts
@@ -311,7 +311,7 @@ Task T067: Document smoke testing in infra/railway/smoke-test.md
 ### Parallel Team Strategy
 
 1. Team completes setup and foundational work together.
-2. Backend-focused developer handles services, routes, Prisma, and backend tests.
+2. Backend-focused developer handles services, routes, the database layer, and backend tests.
 3. Frontend-focused developer handles pages, components, query states, and e2e tests.
 4. Deployment/documentation-focused developer handles Railway, README, smoke tests, and demo artifacts after deployable slices exist.
 

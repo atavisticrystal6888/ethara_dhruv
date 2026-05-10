@@ -38,7 +38,7 @@ Production Railway values must use Railway-provided `DATABASE_URL`, a strong `JW
 ```text
 cd backend
 npm install
-npm run prisma:migrate
+npm run db:migrate
 npm run dev
 
 cd ../frontend
@@ -78,8 +78,8 @@ npm run test:e2e
 2. Provision Railway PostgreSQL.
 3. Add backend service and configure `DATABASE_URL`, `JWT_SECRET`, `COOKIE_SECURE=true`, `CORS_ORIGIN`, and production `NODE_ENV`.
 4. Add a frontend service that builds `frontend/` and serves the Vite production build.
-5. Run Prisma migrations against Railway PostgreSQL.
-6. Verify `/health` returns `ok` from the deployed backend.
+5. Run SQL migrations against Railway PostgreSQL.
+6. Verify `/api/health` returns `ok` from the deployed backend.
 7. Open the live URL and complete the smoke test flow.
 8. Record the live URL in `README.md` and submission materials.
 

@@ -1,12 +1,12 @@
-import { prisma } from "../../src/models/prisma.js";
+import { database } from "../../src/models/database.js";
 
 export async function resetTestDatabase() {
-  await prisma.task.deleteMany();
-  await prisma.membership.deleteMany();
-  await prisma.project.deleteMany();
-  await prisma.user.deleteMany();
+  await database.task.deleteMany();
+  await database.membership.deleteMany();
+  await database.project.deleteMany();
+  await database.user.deleteMany();
 }
 
 export async function disconnectTestDatabase() {
-  await prisma.$disconnect();
+  await database.$disconnect();
 }

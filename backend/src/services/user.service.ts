@@ -1,13 +1,11 @@
 import type { AuthenticatedUser } from "../auth/middleware.js";
-import { requireAdmin } from "../auth/permissions.js";
-import { prisma } from "../models/prisma.js";
+import { database } from "../models/database.js";
 import type { PublicUser } from "./serializers.js";
 import { serializeUser } from "./serializers.js";
 
 export async function searchUsers(user: AuthenticatedUser, query?: string) {
-  requireAdmin(user);
   const trimmedQuery = query?.trim();
-  const users = (await prisma.user.findMany({
+  const users = (await database.user.findMany({
     where: trimmedQuery
       ? {
           OR: [

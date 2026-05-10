@@ -14,7 +14,13 @@ export function ProjectForm({ onSubmit, pending }: { onSubmit: (input: { name: s
   }
 
   return (
-    <form className="panel form-grid" onSubmit={handleSubmit}>
+    <form className="panel form-grid project-form" onSubmit={handleSubmit}>
+      <div className="section-header">
+        <div>
+          <h2>Create workspace</h2>
+          <p>Any signed-in teammate can open a project and become its first owner.</p>
+        </div>
+      </div>
       <FormField label="Project name">
         <TextInput value={name} onChange={(event) => setName(event.target.value)} minLength={3} required />
       </FormField>
