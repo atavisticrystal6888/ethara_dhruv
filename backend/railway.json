@@ -1,0 +1,24 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "RAILPACK",
+    "buildCommand": "npm run build",
+    "watchPatterns": [
+      "src/**",
+      "db/**",
+      "scripts/**",
+      "package.json",
+      "tsconfig.json"
+    ]
+  },
+  "deploy": {
+    "preDeployCommand": [
+      "npm run db:deploy"
+    ],
+    "startCommand": "npm run start:prod",
+    "healthcheckPath": "/api/health",
+    "healthcheckTimeout": 300,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}
