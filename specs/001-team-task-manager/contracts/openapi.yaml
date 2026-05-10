@@ -1,0 +1,794 @@
+openapi: 3.0.3
+info:
+  title: Team Task Manager REST API
+  version: 1.0.0
+  description: REST contract for the FSWA Team Task Manager assignment.
+servers:
+  - url: http://localhost:3000/api
+    description: Local development API
+  - url: https://{railwayHost}/api
+    description: Railway production API
+    variables:
+      railwayHost:
+        default: example.up.railway.app
+security:
+  - cookieAuth: []
+tags:
+  - name: Health
+  - name: Auth
+  - name: Users
+  - name: Projects
+  - name: Memberships
+  - name: Tasks
+  - name: Dashboard
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Check service and database health
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /auth/signup:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+      responses:
+        '201':
+          description: User registered and authenticated
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: HTTP-only authentication cookie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Authenticate an existing user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: User authenticated
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: HTTP-only authentication cookie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Clear the active session
+      responses:
+        '204':
+          description: Session cleared
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Return the authenticated user
+      responses:
+        '200':
+          description: Authenticated user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users:
+    get:
+      tags: [Users]
+      summary: Search registered users for project membership assignment
+      description: Admin only. Returns safe user fields only.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Matching users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /projects:
+    get:
+      tags: [Projects]
+      summary: List projects accessible to the current user
+      responses:
+        '200':
+          description: Accessible projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Projects]
+      summary: Create a project
+      description: Admin only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreateRequest'
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /projects/{projectId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Projects]
+      summary: Get project details
+      responses:
+        '200':
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Projects]
+      summary: Update project details
+      description: Admin only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectUpdateRequest'
+      responses:
+        '200':
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Projects]
+      summary: Delete a project
+      description: Admin only.
+      responses:
+        '204':
+          description: Project deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{projectId}/memberships:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Memberships]
+      summary: List project members
+      responses:
+        '200':
+          description: Project memberships
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Membership'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Memberships]
+      summary: Add an existing user to a project
+      description: Admin only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MembershipCreateRequest'
+      responses:
+        '201':
+          description: Membership created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Membership'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /projects/{projectId}/memberships/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/UserId'
+    delete:
+      tags: [Memberships]
+      summary: Remove a user from a project
+      description: Admin only. Removal fails if assignment rules require reassignment first.
+      responses:
+        '204':
+          description: Membership removed
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{projectId}/tasks:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Tasks]
+      summary: List tasks for a project
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/TaskStatus'
+        - name: assigneeId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Project tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Tasks]
+      summary: Create a task in a project
+      description: Admin only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreateRequest'
+      responses:
+        '201':
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{projectId}/tasks/{taskId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      tags: [Tasks]
+      summary: Get task details
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Tasks]
+      summary: Update a task
+      description: Admins can update all task fields; assigned Members can update status only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskUpdateRequest'
+      responses:
+        '200':
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Tasks]
+      summary: Delete a task
+      description: Admin only.
+      responses:
+        '204':
+          description: Task deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /dashboard:
+    get:
+      tags: [Dashboard]
+      summary: Get current user's dashboard summary
+      responses:
+        '200':
+          description: Dashboard summary derived from persisted data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: fswa_session
+
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        type: string
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    Unauthorized:
+      description: Authentication required or invalid session
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Authenticated user is not allowed to perform the action
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found or not visible to caller
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: Request conflicts with existing state
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
+    ServiceUnavailable:
+      description: Service or database dependency unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    Role:
+      type: string
+      enum: [ADMIN, MEMBER]
+    TaskStatus:
+      type: string
+      enum: [TODO, IN_PROGRESS, DONE]
+    User:
+      type: object
+      required: [id, name, email, role, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/Role'
+        createdAt:
+          type: string
+          format: date-time
+    SignupRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          description: Must include at least one letter and one number.
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    AuthSession:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+    ProjectSummary:
+      type: object
+      required: [id, name, createdById, memberCount, taskCount, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        createdById:
+          type: string
+        memberCount:
+          type: integer
+          minimum: 0
+        taskCount:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+    Project:
+      allOf:
+        - $ref: '#/components/schemas/ProjectSummary'
+        - type: object
+          required: [members, tasks]
+          properties:
+            members:
+              type: array
+              items:
+                $ref: '#/components/schemas/Membership'
+            tasks:
+              type: array
+              items:
+                $ref: '#/components/schemas/Task'
+    ProjectCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 1000
+    ProjectUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 1000
+    MembershipCreateRequest:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: string
+    Membership:
+      type: object
+      required: [id, projectId, user, createdAt]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+        createdAt:
+          type: string
+          format: date-time
+    TaskCreateRequest:
+      type: object
+      required: [title, status, assigneeId, dueDate]
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 2000
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        assigneeId:
+          type: string
+        dueDate:
+          type: string
+          format: date
+    TaskUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 2000
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        assigneeId:
+          type: string
+        dueDate:
+          type: string
+          format: date
+    Task:
+      type: object
+      required: [id, projectId, title, status, assignee, createdBy, dueDate, isOverdue, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        assignee:
+          $ref: '#/components/schemas/User'
+        createdBy:
+          $ref: '#/components/schemas/User'
+        dueDate:
+          type: string
+          format: date
+        isOverdue:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    StatusTotals:
+      type: object
+      required: [TODO, IN_PROGRESS, DONE]
+      properties:
+        TODO:
+          type: integer
+          minimum: 0
+        IN_PROGRESS:
+          type: integer
+          minimum: 0
+        DONE:
+          type: integer
+          minimum: 0
+    ProjectDashboardSummary:
+      type: object
+      required: [projectId, projectName, totalTasks, statusTotals, overdueTasks, progressPercent]
+      properties:
+        projectId:
+          type: string
+        projectName:
+          type: string
+        totalTasks:
+          type: integer
+          minimum: 0
+        statusTotals:
+          $ref: '#/components/schemas/StatusTotals'
+        overdueTasks:
+          type: integer
+          minimum: 0
+        progressPercent:
+          type: number
+          minimum: 0
+          maximum: 100
+    DashboardSummary:
+      type: object
+      required: [projectCount, totalTasks, assignedTasks, statusTotals, overdueTasks, projectSummaries]
+      properties:
+        projectCount:
+          type: integer
+          minimum: 0
+        totalTasks:
+          type: integer
+          minimum: 0
+        assignedTasks:
+          type: integer
+          minimum: 0
+        statusTotals:
+          $ref: '#/components/schemas/StatusTotals'
+        overdueTasks:
+          type: integer
+          minimum: 0
+        projectSummaries:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectDashboardSummary'
+    HealthResponse:
+      type: object
+      required: [status, database]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        database:
+          type: string
+          enum: [ok]
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+    ValidationErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          required: [fields]
+          properties:
+            fields:
+              type: array
+              items:
+                type: object
+                required: [path, message]
+                properties:
+                  path:
+                    type: string
+                  message:
+                    type: string
