@@ -1,6 +1,6 @@
 # Team Task Manager
 
-Team Task Manager is a full-stack assignment app with a React/Vite frontend, Express REST API, direct PostgreSQL access through `pg`, and SQL-backed schema migrations. It supports secure signup/login, first-user Admin bootstrap, Admin/Member role enforcement, project membership, task assignment, status tracking, dashboard summaries, and Railway deployment evidence.
+Team Task Manager is a full-stack assignment app with a React/Vite frontend, Express REST API, direct PostgreSQL access through `pg`, and SQL-backed schema migrations. It supports secure signup/login, first-user Admin bootstrap, project-scoped collaboration roles, member-created projects/tasks, multi-view task planning, recurring work, time tracking, dashboard reporting, and Railway deployment evidence.
 
 ## Overview
 
@@ -8,6 +8,17 @@ Team Task Manager is a full-stack assignment app with a React/Vite frontend, Exp
 - Backend: Express 5, TypeScript, Zod validation, HTTP-only signed cookie auth with `jose`.
 - Database: PostgreSQL through versioned SQL migrations.
 - Deployment: Railway backend service, Railway frontend service, Railway PostgreSQL.
+
+## MVP Features
+
+- Secure signup and login with first-user Admin bootstrap.
+- Project creation for any authenticated user; project owners/managers can manage collaborators.
+- Project membership roles: `OWNER`, `MANAGER`, and `MEMBER`.
+- Task assignment to individual users or delegated project roles.
+- Multiple project views: list, Kanban board, timeline, and calendar.
+- Recurring task support with auto-generated follow-up tasks after completion.
+- Time tracking with manual logging, timer start/stop controls, and workload reporting.
+- Dashboard summaries for completion rate, recurring work, tracked time, and per-project progress.
 
 ## Local Setup
 
@@ -39,6 +50,7 @@ Or run both apps together from the FSWA root:
 ```text
 npm install
 npm run db:migrate --workspace backend
+npm run db:seed --workspace backend
 npm run dev
 ```
 
@@ -83,6 +95,20 @@ Run local migrations with:
 ```text
 cd backend
 npm run db:migrate
+```
+
+Seed local demo data with:
+
+```text
+cd backend
+npm run db:seed
+```
+
+Demo credentials after seeding:
+
+```text
+avery@teamflow.demo / TeamFlow2026!
+maya@teamflow.demo / TeamFlow2026!
 ```
 
 Run production migrations on Railway with:

@@ -43,8 +43,9 @@ export function TaskForm({
       return;
     }
 
-    if (members.length > 0 && !members.some((membership) => membership.user.id === assigneeId)) {
-      setAssigneeId(members[0].user.id);
+    const firstMember = members[0];
+    if (firstMember && !members.some((membership) => membership.user.id === assigneeId)) {
+      setAssigneeId(firstMember.user.id);
     }
   }, [assigneeId, defaultAssigneeId, members]);
 

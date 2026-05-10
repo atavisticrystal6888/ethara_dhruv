@@ -1,5 +1,7 @@
-import { hash } from "bcryptjs";
+import bcryptjs from "bcryptjs";
 import pg from "pg";
+
+const { hash } = bcryptjs;
 
 const { Client } = pg;
 
