@@ -1,6 +1,6 @@
 # Team Task Manager
 
-Team Task Manager is a full-stack assignment app with a React/Vite frontend, Express REST API, direct PostgreSQL access through `pg`, and SQL-backed schema migrations. It supports secure signup/login, first-user Admin bootstrap, project-scoped collaboration roles, member-created projects/tasks, multi-view task planning, recurring work, time tracking, dashboard reporting, and Railway deployment evidence.
+Team Task Manager is a full-stack assignment app with a React/Vite frontend, Express REST API, direct PostgreSQL access through `pg`, and SQL-backed schema migrations. It supports secure signup/login, first-user Admin bootstrap, project-scoped collaboration roles, member-created projects/tasks, Jira-inspired workspace navigation, backlog and sprint planning, issue collaboration, recurring work, time tracking, dashboard reporting, and Railway deployment evidence.
 
 ## Overview
 
@@ -15,7 +15,11 @@ Team Task Manager is a full-stack assignment app with a React/Vite frontend, Exp
 - Project creation for any authenticated user; project owners/managers can manage collaborators.
 - Project membership roles: `OWNER`, `MANAGER`, and `MEMBER`.
 - Task assignment to individual users or delegated project roles.
+- Work-first project shell with Summary, Board, Backlog, and Team tabs.
 - Multiple project views: list, Kanban board, timeline, and calendar.
+- Backlog grooming with sprint creation, assignment, and stable ordering.
+- Issue detail side panel with comments and change activity.
+- Personal `Your Work` page for assigned items, delegated role work, and active timers.
 - Recurring task support with auto-generated follow-up tasks after completion.
 - Time tracking with manual logging, timer start/stop controls, and workload reporting.
 - Dashboard summaries for completion rate, recurring work, tracked time, and per-project progress.
@@ -132,6 +136,7 @@ npm run test:e2e
 ```
 
 Backend integration tests expect a reachable PostgreSQL database through `DATABASE_URL`.
+Backend contract and integration tests default to `postgresql://postgres:postgres@localhost:5432/fswa_test` in the checked-in test setup.
 
 ## Railway Deployment
 

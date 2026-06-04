@@ -8,6 +8,7 @@ import { LoginPage } from "../pages/LoginPage";
 import { ProjectDetailPage } from "../pages/ProjectDetailPage";
 import { ProjectsPage } from "../pages/ProjectsPage";
 import { SignupPage } from "../pages/SignupPage";
+import { YourWorkPage } from "../pages/YourWorkPage";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ export function AppRouter() {
             <Route path="/" element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="your-work" element={<YourWorkPage />} />
               <Route path="projects" element={<ProjectsPage />} />
               <Route path="projects/:projectId" element={<ProjectDetailPage />} />
             </Route>

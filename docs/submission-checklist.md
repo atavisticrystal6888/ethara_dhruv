@@ -16,8 +16,12 @@
 - [ ] Admin can create a project and add a Member.
 - [ ] Member cannot manage project membership.
 - [ ] Admin can create, assign, update, and delete tasks.
+- [ ] Project workspace exposes Summary, Board, Backlog, and Team tabs without layout breakage.
+- [ ] Backlog flow supports sprint creation, backlog assignment, and persisted ordering.
+- [ ] Issue detail panel shows comments and activity history after updates.
+- [ ] `Your Work` shows assigned or role-delegated items for the current user.
 - [ ] Member can update status only for assigned tasks.
 - [ ] Dashboard totals match persisted task data.
 - [ ] Responsive desktop and mobile layouts have no horizontal scrolling or overlapping text.
 - [ ] README includes overview, setup, env vars, database, Railway deployment, live URL, and demo video link.
-- [ ] Demo video is 2 to 5 minutes and covers auth, RBAC, projects, tasks, dashboard, and deployment proof.
+- [ ] Demo video is 2 to 5 minutes and covers auth, RBAC, projects, backlog/sprint planning, issue collaboration, dashboard, `Your Work`, and deployment proof.

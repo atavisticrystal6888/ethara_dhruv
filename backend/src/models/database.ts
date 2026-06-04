@@ -17,7 +17,7 @@ async function getDatabase() {
   return globalForDatabase.databaseClientPromise;
 }
 
-function createModelDelegate(model: keyof Pick<DatabaseClient, "user" | "project" | "membership" | "task">) {
+function createModelDelegate(model: keyof Pick<DatabaseClient, "user" | "project" | "membership" | "sprint" | "taskComment" | "taskActivity" | "task">) {
   return {
     count: async (args?: Record<string, unknown>) => (await getDatabase())[model].count(args),
     create: async (args: Record<string, unknown>) => (await getDatabase())[model].create(args),
@@ -37,6 +37,9 @@ export const database =
     user: createModelDelegate("user"),
     project: createModelDelegate("project"),
     membership: createModelDelegate("membership"),
+    sprint: createModelDelegate("sprint"),
+    taskComment: createModelDelegate("taskComment"),
+    taskActivity: createModelDelegate("taskActivity"),
     task: createModelDelegate("task"),
     $disconnect: async () => {
       const database = await getDatabase();

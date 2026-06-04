@@ -1,0 +1,33 @@
+DO $$ BEGIN
+  CREATE TYPE "TaskIssueType" AS ENUM ('EPIC', 'STORY', 'TASK', 'BUG');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "TaskPriority" AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+ALTER TABLE "Task"
+  ADD COLUMN IF NOT EXISTS "issueType" "TaskIssueType" NOT NULL DEFAULT 'TASK';
+
+ALTER TABLE "Task"
+  ADD COLUMN IF NOT EXISTS "priority" "TaskPriority" NOT NULL DEFAULT 'MEDIUM';
+
+ALTER TABLE "Task"
+  ADD COLUMN IF NOT EXISTS "storyPoints" INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE "Task"
+  ADD COLUMN IF NOT EXISTS "labels" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
+
+ALTER TABLE "Task"
+  ADD COLUMN IF NOT EXISTS "sortOrder" BIGINT NOT NULL DEFAULT 0;
+
+UPDATE "Task"
+SET "sortOrder" = FLOOR(EXTRACT(EPOCH FROM "createdAt") * 1000)
+WHERE "sortOrder" = 0;
+
+CREATE INDEX IF NOT EXISTS "Task_issueType_idx" ON "Task" ("issueType");
+CREATE INDEX IF NOT EXISTS "Task_priority_idx" ON "Task" ("priority");

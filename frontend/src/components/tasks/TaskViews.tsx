@@ -1,7 +1,18 @@
 import type { Task, TaskStatus } from "../../api/client";
+import { Button } from "../ui/Button";
+import { IssueTypeBadge } from "./IssueTypeBadge";
+import { PriorityBadge } from "./PriorityBadge";
 import { StatusBadge } from "./StatusBadge";
 
 const columns: TaskStatus[] = ["TODO", "IN_PROGRESS", "DONE"];
+
+function orderedTasks(tasks: Task[]) {
+  return [...tasks].sort((left, right) => left.sortOrder - right.sortOrder || left.createdAt.localeCompare(right.createdAt));
+}
+
+function columnLabel(status: TaskStatus) {
+  return status === "TODO" ? "To Do" : status === "IN_PROGRESS" ? "In Progress" : "Done";
+}
 
 function formatHours(minutes: number) {
   const hours = minutes / 60;
@@ -16,31 +27,62 @@ function formatShortDate(value: Date) {
   return value.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-export function TaskBoardView({ tasks }: { tasks: Task[] }) {
+export function TaskBoardView({
+  tasks,
+  canManage = false,
+  pending = false,
+  onSelectTask,
+  onMoveTask,
+  onMoveAcrossColumns
+}: {
+  tasks: Task[];
+  canManage?: boolean;
+  pending?: boolean;
+  onSelectTask?: (task: Task) => void;
+  onMoveTask?: (taskId: string, status: TaskStatus, direction: "up" | "down") => unknown;
+  onMoveAcrossColumns?: (taskId: string, direction: "left" | "right") => unknown;
+}) {
   return (
     <div className="board-grid">
-      {columns.map((column) => {
-        const columnTasks = tasks.filter((task) => task.status === column);
+      {columns.map((column, columnIndex) => {
+        const columnTasks = orderedTasks(tasks.filter((task) => task.status === column));
         return (
           <section className="panel stack board-column" key={column}>
             <div className="section-header">
               <div>
-                <h2>{column === "TODO" ? "To Do" : column === "IN_PROGRESS" ? "In Progress" : "Done"}</h2>
+                <h2>{columnLabel(column)}</h2>
                 <p>{columnTasks.length} tasks</p>
               </div>
             </div>
             {columnTasks.length === 0 ? <p className="muted-copy">No tasks in this lane.</p> : null}
-            {columnTasks.map((task) => (
+            {columnTasks.map((task, index) => (
               <article className="board-card" key={task.id}>
                 <div className="task-card-head">
                   <strong>{task.title}</strong>
-                  <StatusBadge status={task.status} overdue={task.isOverdue} />
+                  <div className="task-card-badges">
+                    <IssueTypeBadge issueType={task.issueType} />
+                    <PriorityBadge priority={task.priority} />
+                    <StatusBadge status={task.status} overdue={task.isOverdue} />
+                  </div>
                 </div>
                 <p>{task.description}</p>
+                <div className="task-chip-row">
+                  {task.labels.map((label) => <span className="mini-pill" key={label}>{label}</span>)}
+                  <span className="mini-pill">{task.storyPoints} pts</span>
+                </div>
                 <div className="task-meta-row compact-meta">
                   <span>{task.assignmentLabel}</span>
                   <span>{formatHours(task.trackedMinutes)}</span>
                 </div>
+                {canManage && onMoveTask && onMoveAcrossColumns ? (
+                  <div className="board-card-actions">
+                    <Button type="button" variant="secondary" disabled={pending || columnIndex === 0} onClick={() => void onMoveAcrossColumns(task.id, "left")}>Move left</Button>
+                    <Button type="button" variant="secondary" disabled={pending || index === 0} onClick={() => void onMoveTask(task.id, column, "up")}>Move up</Button>
+                    <Button type="button" variant="secondary" disabled={pending || index === columnTasks.length - 1} onClick={() => void onMoveTask(task.id, column, "down")}>Move down</Button>
+                    <Button type="button" variant="secondary" disabled={pending || columnIndex === columns.length - 1} onClick={() => void onMoveAcrossColumns(task.id, "right")}>Move right</Button>
+                  </div>
+                ) : null}
+                {onSelectTask ? <Button type="button" variant="secondary" onClick={() => onSelectTask(task)}>Open issue</Button> : null}
               </article>
             ))}
           </section>

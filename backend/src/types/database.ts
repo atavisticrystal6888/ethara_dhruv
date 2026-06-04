@@ -1,4 +1,4 @@
-import type { ProjectRole, RecurrencePattern, Role, TaskAssignmentType, TaskStatus } from "./domain.js";
+import type { ProjectRole, RecurrencePattern, Role, SprintStatus, TaskActivityType, TaskAssignmentType, TaskIssueType, TaskPriority, TaskStatus } from "./domain.js";
 
 type QueryArgs = Record<string, unknown>;
 
@@ -18,6 +18,9 @@ export type DatabaseClient = {
   user: ModelDelegate;
   project: ModelDelegate;
   membership: ModelDelegate;
+  sprint: ModelDelegate;
+  taskComment: ModelDelegate;
+  taskActivity: ModelDelegate;
   task: ModelDelegate;
   $disconnect(): Promise<void>;
   $queryRaw<T = unknown>(query: TemplateStringsArray, ...values: unknown[]): Promise<T>;
@@ -50,17 +53,53 @@ export type DbMembership = {
   createdAt: Date;
 };
 
+export type DbSprint = {
+  id: string;
+  projectId: string;
+  name: string;
+  goal: string | null;
+  status: SprintStatus;
+  startDate: Date | null;
+  endDate: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type DbTaskComment = {
+  id: string;
+  taskId: string;
+  authorId: string;
+  body: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type DbTaskActivity = {
+  id: string;
+  taskId: string;
+  actorId: string;
+  type: TaskActivityType;
+  message: string;
+  createdAt: Date;
+};
+
 export type DbTask = {
   id: string;
   projectId: string;
   title: string;
   description: string | null;
   status: TaskStatus;
+  issueType: TaskIssueType;
+  priority: TaskPriority;
   assignmentType: TaskAssignmentType;
   assigneeId: string | null;
   assigneeRole: ProjectRole | null;
   createdById: string;
   dueDate: Date;
+  sprintId: string | null;
+  storyPoints: number;
+  labels: string[];
+  sortOrder: number;
   estimatedMinutes: number;
   trackedMinutes: number;
   timerStartedAt: Date | null;

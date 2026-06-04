@@ -23,9 +23,9 @@ export function ProjectsPage() {
     <div className="page stack projects-page">
       <section className="panel page-hero">
         <div>
-          <div className="eyebrow">Workspace hub</div>
+          <div className="eyebrow">Workspace index</div>
           <h1>Projects</h1>
-          <p>{user?.name}, open a workspace, delegate by role, and switch between list, board, timeline, and calendar planning.</p>
+          <p>{user?.name}, jump straight into boards, ownership, and delivery context without hunting through broad overview pages.</p>
         </div>
         <div className="hero-metrics">
           <div className="hero-stat"><span>Visible workspaces</span><strong>{projectsQuery.data?.length ?? 0}</strong></div>
@@ -44,7 +44,7 @@ export function ProjectsPage() {
               <h2>{project.name}</h2>
               <span className="mini-pill">{project.memberCount} people</span>
             </div>
-            <p>{project.description || "No description yet. Use the workspace to add members, recurring tasks, and time logs."}</p>
+            <p>{project.description || "No description yet. Open the workspace to manage issues, people, and delivery pace."}</p>
             <div className="project-card-metrics">
               <span>{project.taskCount} tasks</span>
               <span>{new Date(project.createdAt).toLocaleDateString()}</span>

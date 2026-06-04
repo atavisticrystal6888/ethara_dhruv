@@ -5,6 +5,7 @@ import { projectCreateSchema, projectIdParamsSchema, projectUpdateSchema } from 
 import { membershipRouter } from "./membership.routes.js";
 import { asyncHandler } from "./middleware/error.js";
 import { validateRequest } from "./middleware/validate.js";
+import { sprintRouter } from "./sprint.routes.js";
 import { taskRouter } from "./task.routes.js";
 
 export const projectRouter = Router();
@@ -18,6 +19,7 @@ projectRouter.post("/", validateRequest({ body: projectCreateSchema }), asyncHan
 }));
 
 projectRouter.use("/:projectId/memberships", membershipRouter);
+projectRouter.use("/:projectId/sprints", sprintRouter);
 projectRouter.use("/:projectId/tasks", taskRouter);
 
 projectRouter.get("/:projectId", validateRequest({ params: projectIdParamsSchema }), asyncHandler(async (request, response) => {

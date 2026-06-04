@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/Button";
 import { ErrorAlert } from "../components/ui/ErrorAlert";
 import { FormField, TextInput } from "../components/ui/FormField";
+import { DemoButton } from "../demo/DemoButton";
 import { useAuth } from "../state/auth";
 
 export function SignupPage() {
@@ -54,6 +55,7 @@ export function SignupPage() {
             <TextInput type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} required />
           </FormField>
           <Button disabled={submitting}>{submitting ? "Creating" : "Create account"}</Button>
+          <DemoButton />
           <Link to="/login">Use existing account</Link>
         </form>
       </section>

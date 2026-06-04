@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { ProjectRole, RecurrencePattern, Role, TaskAssignmentType, TaskStatus } from "../types/domain.js";
-import type { DatabaseClient, DbMembership, DbProject, DbTask, DbUser } from "../types/database.js";
+import type { ProjectRole, RecurrencePattern, Role, SprintStatus, TaskActivityType, TaskAssignmentType, TaskIssueType, TaskPriority, TaskStatus } from "../types/domain.js";
+import type { DatabaseClient, DbMembership, DbProject, DbSprint, DbTask, DbTaskActivity, DbTaskComment, DbUser } from "../types/database.js";
 
 type Args = Record<string, unknown>;
 type Select = Record<string, boolean>;
@@ -9,6 +9,9 @@ type Store = {
   users: DbUser[];
   projects: DbProject[];
   memberships: DbMembership[];
+  sprints: DbSprint[];
+  taskComments: DbTaskComment[];
+  taskActivities: DbTaskActivity[];
   tasks: DbTask[];
 };
 
@@ -33,7 +36,7 @@ function databaseConflict() {
 }
 
 export function createMemoryDatabase(): DatabaseClient {
-  const store: Store = { users: [], projects: [], memberships: [], tasks: [] };
+  const store: Store = { users: [], projects: [], memberships: [], sprints: [], taskComments: [], taskActivities: [], tasks: [] };
 
   const publicUser = (userId: string, select?: Select) => {
     const user = store.users.find((candidate) => candidate.id === userId);
@@ -57,6 +60,26 @@ export function createMemoryDatabase(): DatabaseClient {
     };
   };
 
+  const taskCommentWithInclude = (comment: DbTaskComment, include?: Args) => {
+    if (!include) return comment;
+    const authorInclude = include.author as { select?: Select } | undefined;
+    return {
+      ...comment,
+      ...(authorInclude ? { author: publicUser(comment.authorId, authorInclude.select) } : {})
+    };
+  };
+
+  const taskActivityWithInclude = (activity: DbTaskActivity, include?: Args) => {
+    if (!include) return activity;
+    const actorInclude = include.actor as { select?: Select } | undefined;
+    return {
+      ...activity,
+      ...(actorInclude ? { actor: publicUser(activity.actorId, actorInclude.select) } : {})
+    };
+  };
+
+  const sprintWithInclude = (sprint: DbSprint) => sprint;
+
   const projectWithInclude = (project: DbProject, include?: Args) => {
     if (!include) return project;
     const result: Record<string, unknown> = { ...project };
@@ -69,12 +92,24 @@ export function createMemoryDatabase(): DatabaseClient {
       ).map((membership) => membershipWithInclude(membership, membershipInclude.include));
     }
 
+    if (include.sprints) {
+      const sprintDirection = ((include.sprints as { orderBy?: { createdAt?: "asc" | "desc" } }).orderBy?.createdAt ?? "desc");
+      result.sprints = sortByCreatedAt(
+        store.sprints.filter((sprint) => sprint.projectId === project.id),
+        sprintDirection
+      ).map((sprint) => sprintWithInclude(sprint));
+    }
+
     if (include.tasks) {
-      const taskRecords = sortByCreatedAt(
-        store.tasks.filter((task) => task.projectId === project.id),
-        "desc"
-      );
-      result.tasks = include.tasks === true ? taskRecords : taskRecords.map((task) => taskWithInclude(task, (include.tasks as { include?: Args }).include));
+      const taskConfig = include.tasks === true ? {} : (include.tasks as { include?: Args; orderBy?: { createdAt?: "asc" | "desc"; sortOrder?: "asc" | "desc" } });
+      const taskDirection = taskConfig.orderBy?.sortOrder ?? taskConfig.orderBy?.createdAt ?? "desc";
+      const taskRecords = [...store.tasks.filter((task) => task.projectId === project.id)].sort((left, right) => {
+        const delta = taskConfig.orderBy?.sortOrder
+          ? left.sortOrder - right.sortOrder
+          : left.createdAt.getTime() - right.createdAt.getTime();
+        return taskDirection === "asc" ? delta : -delta;
+      });
+      result.tasks = include.tasks === true ? taskRecords : taskRecords.map((task) => taskWithInclude(task, taskConfig.include));
     }
 
     if (include._count) {
@@ -101,10 +136,27 @@ export function createMemoryDatabase(): DatabaseClient {
     if (where.id && task.id !== where.id) return false;
     if (where.projectId && task.projectId !== where.projectId) return false;
     if (where.assigneeId && task.assigneeId !== where.assigneeId) return false;
+    if (where.sprintId === null && task.sprintId !== null) return false;
+    if (typeof where.sprintId === "string" && task.sprintId !== where.sprintId) return false;
     if (where.recurrenceParentTaskId && task.recurrenceParentTaskId !== where.recurrenceParentTaskId) return false;
     const status = where.status as TaskStatus | { in?: TaskStatus[] } | undefined;
     if (typeof status === "string" && task.status !== status) return false;
     if (typeof status === "object" && status.in && !status.in.includes(task.status)) return false;
+    return true;
+  };
+
+  const matchesTaskCommentWhere = (comment: DbTaskComment, where?: Args) => {
+    if (!where) return true;
+    if (where.id && comment.id !== where.id) return false;
+    if (where.taskId && comment.taskId !== where.taskId) return false;
+    return true;
+  };
+
+  const matchesTaskActivityWhere = (activity: DbTaskActivity, where?: Args) => {
+    if (!where) return true;
+    if (where.id && activity.id !== where.id) return false;
+    if (where.taskId && activity.taskId !== where.taskId) return false;
+    if (where.type && activity.type !== where.type) return false;
     return true;
   };
 
@@ -174,13 +226,20 @@ export function createMemoryDatabase(): DatabaseClient {
       },
       async delete(args) {
         const id = (args.where as { id: string }).id;
+        const projectTaskIds = new Set(store.tasks.filter((task) => task.projectId === id).map((task) => task.id));
         store.tasks = store.tasks.filter((task) => task.projectId !== id);
+        store.taskComments = store.taskComments.filter((comment) => !projectTaskIds.has(comment.taskId));
+        store.taskActivities = store.taskActivities.filter((activity) => !projectTaskIds.has(activity.taskId));
+        store.sprints = store.sprints.filter((sprint) => sprint.projectId !== id);
         store.memberships = store.memberships.filter((membership) => membership.projectId !== id);
         store.projects = store.projects.filter((project) => project.id !== id);
         return {};
       },
       async deleteMany() {
         store.projects = [];
+        store.sprints = [];
+        store.taskComments = [];
+        store.taskActivities = [];
         return { count: 0 };
       },
       async findFirst(args) {
@@ -259,6 +318,187 @@ export function createMemoryDatabase(): DatabaseClient {
         return membershipWithInclude(membership, args.include as Args | undefined);
       }
     },
+    sprint: {
+      async count(args = {}) {
+        const projectId = (args.where as { projectId?: string } | undefined)?.projectId;
+        return store.sprints.filter((sprint) => !projectId || sprint.projectId === projectId).length;
+      },
+      async create(args) {
+        const data = args.data as { projectId: string; name: string; goal?: string | null; status?: SprintStatus; startDate?: Date | null; endDate?: Date | null };
+        const createdAt = new Date();
+        const sprint: DbSprint = {
+          id: randomUUID(),
+          projectId: data.projectId,
+          name: data.name,
+          goal: data.goal ?? null,
+          status: data.status ?? "PLANNED",
+          startDate: data.startDate ?? null,
+          endDate: data.endDate ?? null,
+          createdAt,
+          updatedAt: createdAt
+        };
+        store.sprints.push(sprint);
+        return sprintWithInclude(sprint);
+      },
+      async delete(args) {
+        const id = (args.where as { id: string }).id;
+        store.tasks = store.tasks.map((task) => task.sprintId === id ? { ...task, sprintId: null, updatedAt: new Date() } : task);
+        store.sprints = store.sprints.filter((sprint) => sprint.id !== id);
+        return {};
+      },
+      async deleteMany() {
+        const count = store.sprints.length;
+        store.sprints = [];
+        store.tasks = store.tasks.map((task) => ({ ...task, sprintId: null, updatedAt: new Date() }));
+        return { count };
+      },
+      async findFirst(args) {
+        const where = args.where as { id?: string; projectId?: string; status?: SprintStatus } | undefined;
+        const sprint = store.sprints.find((candidate) => (!where?.id || candidate.id === where.id) && (!where?.projectId || candidate.projectId === where.projectId) && (!where?.status || candidate.status === where.status));
+        return sprint ? sprintWithInclude(sprint) : null;
+      },
+      async findMany(args = {}) {
+        const where = args.where as { projectId?: string; status?: SprintStatus } | undefined;
+        const direction = ((args.orderBy as { createdAt?: "asc" | "desc" } | undefined)?.createdAt ?? "desc");
+        return sortByCreatedAt(store.sprints.filter((sprint) => (!where?.projectId || sprint.projectId === where.projectId) && (!where?.status || sprint.status === where.status)), direction).map((sprint) => sprintWithInclude(sprint));
+      },
+      async findUnique(args) {
+        const id = (args.where as { id: string }).id;
+        const sprint = store.sprints.find((candidate) => candidate.id === id);
+        return sprint ? sprintWithInclude(sprint) : null;
+      },
+      async findUniqueOrThrow(args) {
+        const sprint = await this.findUnique(args);
+        if (!sprint) throw new Error("Sprint not found");
+        return sprint;
+      },
+      async update(args) {
+        const id = (args.where as { id: string }).id;
+        const sprint = store.sprints.find((candidate) => candidate.id === id);
+        if (!sprint) throw new Error("Sprint not found");
+        const data = args.data as { name?: string; goal?: string | null; status?: SprintStatus; startDate?: Date | null; endDate?: Date | null };
+        if (data.name !== undefined) sprint.name = data.name;
+        if (data.goal !== undefined) sprint.goal = data.goal;
+        if (data.status !== undefined) sprint.status = data.status;
+        if (data.startDate !== undefined) sprint.startDate = data.startDate;
+        if (data.endDate !== undefined) sprint.endDate = data.endDate;
+        sprint.updatedAt = new Date();
+        return sprintWithInclude(sprint);
+      }
+    },
+    taskComment: {
+      async count(args = {}) {
+        return store.taskComments.filter((comment) => matchesTaskCommentWhere(comment, args.where as Args | undefined)).length;
+      },
+      async create(args) {
+        const data = args.data as { taskId: string; authorId: string; body: string };
+        const createdAt = new Date();
+        const comment: DbTaskComment = {
+          id: randomUUID(),
+          taskId: data.taskId,
+          authorId: data.authorId,
+          body: data.body,
+          createdAt,
+          updatedAt: createdAt
+        };
+        store.taskComments.push(comment);
+        return taskCommentWithInclude(comment, args.include as Args | undefined);
+      },
+      async delete(args) {
+        const id = (args.where as { id: string }).id;
+        store.taskComments = store.taskComments.filter((comment) => comment.id !== id);
+        return {};
+      },
+      async deleteMany(args = {}) {
+        const before = store.taskComments.length;
+        store.taskComments = store.taskComments.filter((comment) => !matchesTaskCommentWhere(comment, args.where as Args | undefined));
+        return { count: before - store.taskComments.length };
+      },
+      async findFirst(args) {
+        const comment = store.taskComments.find((candidate) => matchesTaskCommentWhere(candidate, args.where as Args | undefined));
+        return comment ? taskCommentWithInclude(comment, args.include as Args | undefined) : null;
+      },
+      async findMany(args = {}) {
+        const direction = ((args.orderBy as { createdAt?: "asc" | "desc" } | undefined)?.createdAt ?? "asc");
+        return sortByCreatedAt(store.taskComments.filter((comment) => matchesTaskCommentWhere(comment, args.where as Args | undefined)), direction)
+          .map((comment) => taskCommentWithInclude(comment, args.include as Args | undefined));
+      },
+      async findUnique(args) {
+        const id = (args.where as { id: string }).id;
+        const comment = store.taskComments.find((candidate) => candidate.id === id);
+        return comment ? taskCommentWithInclude(comment, args.include as Args | undefined) : null;
+      },
+      async findUniqueOrThrow(args) {
+        const comment = await this.findUnique(args);
+        if (!comment) throw new Error("Task comment not found");
+        return comment;
+      },
+      async update(args) {
+        const id = (args.where as { id: string }).id;
+        const comment = store.taskComments.find((candidate) => candidate.id === id);
+        if (!comment) throw new Error("Task comment not found");
+        const data = args.data as { body?: string };
+        if (data.body !== undefined) comment.body = data.body;
+        comment.updatedAt = new Date();
+        return taskCommentWithInclude(comment, args.include as Args | undefined);
+      }
+    },
+    taskActivity: {
+      async count(args = {}) {
+        return store.taskActivities.filter((activity) => matchesTaskActivityWhere(activity, args.where as Args | undefined)).length;
+      },
+      async create(args) {
+        const data = args.data as { taskId: string; actorId: string; type: TaskActivityType; message: string };
+        const activity: DbTaskActivity = {
+          id: randomUUID(),
+          taskId: data.taskId,
+          actorId: data.actorId,
+          type: data.type,
+          message: data.message,
+          createdAt: new Date()
+        };
+        store.taskActivities.push(activity);
+        return taskActivityWithInclude(activity, args.include as Args | undefined);
+      },
+      async delete(args) {
+        const id = (args.where as { id: string }).id;
+        store.taskActivities = store.taskActivities.filter((activity) => activity.id !== id);
+        return {};
+      },
+      async deleteMany(args = {}) {
+        const before = store.taskActivities.length;
+        store.taskActivities = store.taskActivities.filter((activity) => !matchesTaskActivityWhere(activity, args.where as Args | undefined));
+        return { count: before - store.taskActivities.length };
+      },
+      async findFirst(args) {
+        const activity = store.taskActivities.find((candidate) => matchesTaskActivityWhere(candidate, args.where as Args | undefined));
+        return activity ? taskActivityWithInclude(activity, args.include as Args | undefined) : null;
+      },
+      async findMany(args = {}) {
+        const direction = ((args.orderBy as { createdAt?: "asc" | "desc" } | undefined)?.createdAt ?? "desc");
+        return sortByCreatedAt(store.taskActivities.filter((activity) => matchesTaskActivityWhere(activity, args.where as Args | undefined)), direction)
+          .map((activity) => taskActivityWithInclude(activity, args.include as Args | undefined));
+      },
+      async findUnique(args) {
+        const id = (args.where as { id: string }).id;
+        const activity = store.taskActivities.find((candidate) => candidate.id === id);
+        return activity ? taskActivityWithInclude(activity, args.include as Args | undefined) : null;
+      },
+      async findUniqueOrThrow(args) {
+        const activity = await this.findUnique(args);
+        if (!activity) throw new Error("Task activity not found");
+        return activity;
+      },
+      async update(args) {
+        const id = (args.where as { id: string }).id;
+        const activity = store.taskActivities.find((candidate) => candidate.id === id);
+        if (!activity) throw new Error("Task activity not found");
+        const data = args.data as { message?: string; type?: TaskActivityType };
+        if (data.message !== undefined) activity.message = data.message;
+        if (data.type !== undefined) activity.type = data.type;
+        return taskActivityWithInclude(activity, args.include as Args | undefined);
+      }
+    },
     task: {
       async count(args = {}) {
         return store.tasks.filter((task) => matchesTaskWhere(task, args.where as Args | undefined)).length;
@@ -269,11 +509,17 @@ export function createMemoryDatabase(): DatabaseClient {
           title: string;
           description?: string | null;
           status: TaskStatus;
+          issueType?: TaskIssueType;
+          priority?: TaskPriority;
           assignmentType: TaskAssignmentType;
           assigneeId?: string | null;
           assigneeRole?: ProjectRole | null;
           createdById: string;
           dueDate: Date;
+          sprintId?: string | null;
+          storyPoints?: number;
+          labels?: string[];
+          sortOrder?: number;
           estimatedMinutes?: number;
           trackedMinutes?: number;
           timerStartedAt?: Date | null;
@@ -288,11 +534,17 @@ export function createMemoryDatabase(): DatabaseClient {
           title: data.title,
           description: data.description ?? null,
           status: data.status,
+          issueType: data.issueType ?? "TASK",
+          priority: data.priority ?? "MEDIUM",
           assignmentType: data.assignmentType,
           assigneeId: data.assigneeId ?? null,
           assigneeRole: data.assigneeRole ?? null,
           createdById: data.createdById,
           dueDate: data.dueDate,
+          sprintId: data.sprintId ?? null,
+          storyPoints: data.storyPoints ?? 0,
+          labels: data.labels ?? [],
+          sortOrder: data.sortOrder ?? Date.now(),
           estimatedMinutes: data.estimatedMinutes ?? 0,
           trackedMinutes: data.trackedMinutes ?? 0,
           timerStartedAt: data.timerStartedAt ?? null,
@@ -308,11 +560,16 @@ export function createMemoryDatabase(): DatabaseClient {
       async delete(args) {
         const id = (args.where as { id: string }).id;
         store.tasks = store.tasks.filter((task) => task.id !== id);
+        store.taskComments = store.taskComments.filter((comment) => comment.taskId !== id);
+        store.taskActivities = store.taskActivities.filter((activity) => activity.taskId !== id);
         return {};
       },
       async deleteMany() {
+        const count = store.tasks.length;
         store.tasks = [];
-        return { count: 0 };
+        store.taskComments = [];
+        store.taskActivities = [];
+        return { count };
       },
       async findFirst(args) {
         const task = store.tasks.find((candidate) => matchesTaskWhere(candidate, args.where as Args | undefined));
@@ -339,10 +596,16 @@ export function createMemoryDatabase(): DatabaseClient {
           title?: string;
           description?: string | null;
           status?: TaskStatus;
+          issueType?: TaskIssueType;
+          priority?: TaskPriority;
           assignmentType?: TaskAssignmentType;
           assigneeId?: string | null;
           assigneeRole?: ProjectRole | null;
           dueDate?: Date;
+          sprintId?: string | null;
+          storyPoints?: number;
+          labels?: string[];
+          sortOrder?: number;
           estimatedMinutes?: number;
           trackedMinutes?: number;
           timerStartedAt?: Date | null;
@@ -352,10 +615,16 @@ export function createMemoryDatabase(): DatabaseClient {
         if (data.title !== undefined) task.title = data.title;
         if (data.description !== undefined) task.description = data.description;
         if (data.status !== undefined) task.status = data.status;
+        if (data.issueType !== undefined) task.issueType = data.issueType;
+        if (data.priority !== undefined) task.priority = data.priority;
         if (data.assignmentType !== undefined) task.assignmentType = data.assignmentType;
         if (data.assigneeId !== undefined) task.assigneeId = data.assigneeId;
         if (data.assigneeRole !== undefined) task.assigneeRole = data.assigneeRole;
         if (data.dueDate !== undefined) task.dueDate = data.dueDate;
+        if (data.sprintId !== undefined) task.sprintId = data.sprintId;
+        if (data.storyPoints !== undefined) task.storyPoints = data.storyPoints;
+        if (data.labels !== undefined) task.labels = data.labels;
+        if (data.sortOrder !== undefined) task.sortOrder = data.sortOrder;
         if (data.estimatedMinutes !== undefined) task.estimatedMinutes = data.estimatedMinutes;
         if (data.trackedMinutes !== undefined) task.trackedMinutes = data.trackedMinutes;
         if (data.timerStartedAt !== undefined) task.timerStartedAt = data.timerStartedAt;

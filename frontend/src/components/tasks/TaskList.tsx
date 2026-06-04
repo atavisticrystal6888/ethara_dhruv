@@ -1,6 +1,8 @@
 import { Clock3, Play, Square } from "lucide-react";
 import type { ProjectRole, Task, TaskStatus } from "../../api/client";
 import { Button } from "../ui/Button";
+import { IssueTypeBadge } from "./IssueTypeBadge";
+import { PriorityBadge } from "./PriorityBadge";
 import { StatusBadge } from "./StatusBadge";
 
 function formatHours(minutes: number) {
@@ -17,6 +19,7 @@ export function TaskList({
   canManage,
   currentUserId,
   currentProjectRole,
+  onSelectTask,
   onStatusChange,
   onTimerAction,
   onLogTime,
@@ -26,6 +29,7 @@ export function TaskList({
   canManage: boolean;
   currentUserId?: string;
   currentProjectRole?: ProjectRole | null;
+  onSelectTask?: (task: Task) => void;
   onStatusChange: (taskId: string, status: TaskStatus) => Promise<unknown>;
   onTimerAction: (taskId: string, action: "START" | "STOP") => Promise<unknown>;
   onLogTime: (taskId: string, minutes: number) => Promise<unknown>;
@@ -44,17 +48,25 @@ export function TaskList({
               <p>{task.description}</p>
             </div>
             <div className="task-card-badges">
+              <IssueTypeBadge issueType={task.issueType} />
+              <PriorityBadge priority={task.priority} />
               <StatusBadge status={task.status} overdue={task.isOverdue} />
               {task.recurrencePattern !== "NONE" ? <span className="mini-pill">{task.recurrencePattern}</span> : null}
             </div>
           </div>
+          <div className="task-chip-row">
+            {task.labels.map((label) => <span className="mini-pill" key={label}>{label}</span>)}
+            <span className="mini-pill">{task.storyPoints} pts</span>
+          </div>
           <div className="task-meta-row">
             <span>{task.assignmentLabel}</span>
+            <span>Reporter {task.createdBy.name}</span>
             <span>Due {formatDueDate(task.dueDate)}</span>
             <span>{formatHours(task.trackedMinutes)} tracked / {formatHours(task.estimatedMinutes)} planned</span>
             {task.timerStartedAt ? <span>Timer live</span> : null}
           </div>
           <div className="task-actions">
+            {onSelectTask ? <Button variant="secondary" type="button" onClick={() => onSelectTask(task)}>Open issue</Button> : null}
             <select className="input compact" value={task.status} disabled={!canOperateTask(task)} onChange={(event) => void onStatusChange(task.id, event.target.value as TaskStatus)}>
               <option value="TODO">To Do</option>
               <option value="IN_PROGRESS">In Progress</option>

@@ -8,11 +8,11 @@ export function SummaryCards({ summary }: { summary: DashboardSummary }) {
   };
 
   const cards = [
-    { label: "Projects", value: summary.projectCount, hint: "active workspaces", icon: FolderKanban },
-    { label: "Tasks", value: summary.totalTasks, hint: "all tracked items", icon: ListTodo },
+    { label: "My queue", value: summary.assignedTasks, hint: "assigned to you", icon: ListTodo },
+    { label: "Overdue", value: summary.overdueTasks, hint: "needs attention", icon: Activity },
     { label: "Completion", value: `${summary.completionRate}%`, hint: "done rate", icon: Gauge },
     { label: "Tracked", value: formatHours(summary.trackedMinutesTotal), hint: "logged effort", icon: TimerReset },
-    { label: "Active timers", value: summary.activeTimerCount, hint: "currently running", icon: Activity },
+    { label: "Projects", value: summary.projectCount, hint: "active workspaces", icon: FolderKanban },
     { label: "Recurring", value: summary.recurringTaskCount, hint: "automation enabled", icon: RefreshCcw }
   ];
 

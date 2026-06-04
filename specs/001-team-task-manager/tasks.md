@@ -201,6 +201,113 @@ description: "Tasks for Team Task Manager implementation"
 
 ---
 
+## Phase 9: User Story 6 - Operate From A Work-First Workspace (Priority: P1 Uplift)
+
+**Goal**: Replace the presentation-first shell with a denser project workspace that keeps board views, team context, and issue creation in one operating surface.
+
+**Independent Test**: Open a project, switch between Summary, Board, and Team tabs, filter the board, toggle quick-create, and confirm the shell remains usable at desktop and mobile widths.
+
+### Tests for User Story 6
+
+- [X] T080 [P] [US6] Add workspace shell, project tab, and board-toolbar coverage in frontend/tests/unit/project-workspace.test.tsx and the existing frontend/tests/e2e/dashboard.spec.ts and frontend/tests/e2e/submission-smoke.spec.ts flows
+
+### Implementation for User Story 6
+
+- [X] T081 [US6] Implement route-aware top bar and denser shell navigation in frontend/src/components/layout/AppShell.tsx and frontend/src/components/layout/TopBar.tsx
+- [X] T082 [US6] Implement project tabs and board toolbar in frontend/src/components/layout/ProjectTabs.tsx, frontend/src/components/tasks/BoardToolbar.tsx, and frontend/src/pages/ProjectDetailPage.tsx
+- [X] T083 [US6] Refine dense workspace tokens and responsive behavior in frontend/src/styles/theme.css
+- [X] T084 [US6] Convert issue creation into a toggleable workspace panel in frontend/src/components/tasks/TaskForm.tsx and frontend/src/pages/ProjectDetailPage.tsx
+- [X] T085 [US6] Rebalance dashboard and projects entry copy toward work-first scanning in frontend/src/pages/DashboardPage.tsx and frontend/src/pages/ProjectsPage.tsx
+
+**Checkpoint**: Project work happens through a denser shell with tabs, quick-create, and board-level controls instead of one long mixed page.
+
+---
+
+## Phase 10: User Story 7 - Expand Tasks Into Rich Issues (Priority: P2 Uplift)
+
+**Goal**: Add issue metadata needed for triage and planning, including issue type, priority, reporter, story points, and stable ordering.
+
+**Independent Test**: Create issues with metadata, reload the project, and verify type, priority, reporter, points, and ordering persist and round-trip through the API.
+
+### Tests for User Story 7
+
+- [ ] T086 [P] [US7] Add contract coverage for issue metadata in backend/tests/contract/tasks.contract.test.ts and backend/tests/contract/dashboard.contract.test.ts
+- [ ] T087 [P] [US7] Add issue metadata persistence and filtering tests in backend/tests/integration/tasks.integration.test.ts and frontend/tests/e2e/task-management.spec.ts
+
+### Implementation for User Story 7
+
+- [X] T088 [US7] Add issue metadata schema and migration support in backend/db/migrations/003_issue_metadata.sql, backend/src/types/domain.ts, and backend/src/types/database.ts
+- [X] T089 [US7] Extend task validation, serialization, and service rules for issue metadata in backend/src/validations/task.schemas.ts, backend/src/services/task.service.ts, and backend/src/services/serializers.ts
+- [X] T090 [US7] Persist issue metadata across database adapters in backend/src/models/postgresDatabase.ts, backend/src/models/memoryDatabase.ts, and backend/src/models/memoryPrisma.ts
+- [X] T091 [US7] Expand frontend API types and issue editing fields in frontend/src/api/client.ts, frontend/src/components/tasks/TaskForm.tsx, and frontend/src/pages/ProjectDetailPage.tsx
+- [X] T092 [US7] Implement priority and issue-type visual badges in frontend/src/components/tasks/PriorityBadge.tsx, frontend/src/components/tasks/IssueTypeBadge.tsx, frontend/src/components/tasks/TaskList.tsx, and frontend/src/components/tasks/TaskViews.tsx
+
+**Checkpoint**: Every task behaves more like a delivery issue with stronger triage context.
+
+---
+
+## Phase 11: User Story 8 - Add Backlog, Sprint, and Ordering Flows (Priority: P3 Uplift)
+
+**Goal**: Support backlog grooming, sprint assignment, and board ordering instead of read-only planning views.
+
+**Independent Test**: Reorder backlog issues, move work into a sprint, change issue order, and verify the order remains stable after refresh.
+
+### Tests for User Story 8
+
+- [X] T093 [P] [US8] Add backlog and sprint browser flow coverage in the existing frontend/tests/e2e/task-management.spec.ts flow
+- [X] T094 [P] [US8] Add toolbar filter and ordering state unit coverage in frontend/tests/unit/project-workspace.test.tsx
+
+### Implementation for User Story 8
+
+- [X] T095 [US8] Add task query and ordering support to REST routes in backend/src/api/task.routes.ts, backend/src/services/task.service.ts, and frontend/src/api/client.ts
+- [X] T096 [US8] Implement backlog and planning views in frontend/src/components/tasks/BacklogView.tsx and frontend/src/pages/ProjectDetailPage.tsx
+- [X] T097 [US8] Add sprint persistence and lifecycle support in backend/db/migrations/004_sprints.sql, backend/src/api/sprint.routes.ts, backend/src/services/sprint.service.ts, and backend/src/models/postgresDatabase.ts
+- [X] T098 [US8] Implement board and backlog ordering interactions in frontend/src/components/tasks/TaskViews.tsx and frontend/src/components/tasks/BacklogView.tsx
+
+**Checkpoint**: Planning moves from static views to backlog and sprint management.
+
+---
+
+## Phase 12: User Story 9 - Add Issue Collaboration and Activity (Priority: P4 Uplift)
+
+**Goal**: Make each issue a collaboration object with comments and change history.
+
+**Independent Test**: Open an issue, add a comment, update status or assignee, and verify the comment and activity history are shown in the issue context.
+
+### Tests for User Story 9
+
+- [X] T099 [P] [US9] Add contract and integration coverage for comments and activity history in backend/tests/contract/task-collaboration.contract.test.ts and backend/tests/integration/task-collaboration.integration.test.ts
+
+### Implementation for User Story 9
+
+- [X] T100 [US9] Add comment and activity persistence in backend/db/migrations/005_task_collaboration.sql, backend/src/models/postgresDatabase.ts, and backend/src/services/task.service.ts
+- [X] T101 [US9] Expose comment and activity endpoints in backend/src/api/task.routes.ts and frontend/src/api/client.ts
+- [X] T102 [US9] Implement issue detail, comment thread, and activity feed UI in frontend/src/components/tasks/TaskDetailPanel.tsx and frontend/src/pages/ProjectDetailPage.tsx
+
+**Checkpoint**: Users can discuss work and inspect recent issue history without leaving the app.
+
+---
+
+## Phase 13: User Story 10 - Harden The Upgraded Workspace (Priority: P5 Uplift)
+
+**Goal**: Finish the Jira-inspired uplift with improved work surfaces, docs, and end-to-end validation.
+
+**Independent Test**: From the live or local app, navigate dashboard to project workspace, filter issues, create and edit issues, move planning state, and confirm the upgraded flows remain responsive and documented.
+
+### Tests for User Story 10
+
+- [X] T103 [P] [US10] Add full upgraded-workspace smoke coverage in the existing frontend/tests/e2e/dashboard.spec.ts, frontend/tests/e2e/submission-smoke.spec.ts, and frontend/tests/e2e/responsive-polish.spec.ts flows
+
+### Implementation for User Story 10
+
+- [X] T104 [US10] Rebalance dashboard and add a personal work surface in frontend/src/pages/DashboardPage.tsx, frontend/src/components/dashboard/SummaryCards.tsx, frontend/src/components/dashboard/ProjectProgressList.tsx, frontend/src/components/dashboard/WorkloadReport.tsx, and frontend/src/pages/YourWorkPage.tsx
+- [X] T105 [US10] Update README, demo script, and submission checklist for the upgraded workspace in README.md, docs/demo-script.md, and docs/submission-checklist.md
+- [X] T106 [US10] Run final upgraded-workspace validation across backend/tests/, frontend/tests/, specs/001-team-task-manager/quickstart.md, and infra/railway/smoke-test.md
+
+**Checkpoint**: The upgraded workspace is validated, documented, and demo-ready.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -213,6 +320,11 @@ description: "Tasks for Team Task Manager implementation"
 - **Phase 6 User Story 4**: Depends on Phase 2 and can run alongside story implementation once pages/components exist.
 - **Phase 7 User Story 5**: Depends on completed target stories and final deployment readiness.
 - **Phase 8 Polish**: Depends on all desired user stories being complete.
+- **Phase 9 User Story 6**: Depends on the existing shipped workspace and begins the Jira-inspired UX uplift on the current frontend shell.
+- **Phase 10 User Story 7**: Depends on Phase 9 workspace surfaces so richer issue metadata has places to live.
+- **Phase 11 User Story 8**: Depends on Phase 10 issue metadata and ordering fields.
+- **Phase 12 User Story 9**: Depends on Phase 10 issue context and benefits from Phase 11 detail surfaces.
+- **Phase 13 User Story 10**: Depends on completion of the uplift phases and closes with validation and delivery updates.
 
 ### User Story Dependencies
 
@@ -221,6 +333,11 @@ description: "Tasks for Team Task Manager implementation"
 - **US3 (P3)**: Starts after Foundational. Dashboard implementation can begin independently, but validation needs project/task records.
 - **US4 (P4)**: Starts after Foundational. Can proceed in parallel with UI-heavy tasks in US1-US3.
 - **US5 (P5)**: Starts after target app functionality is complete enough for deployment and demo evidence.
+- **US6 (P1 uplift)**: Starts after the original app is stable and restructures the day-to-day workspace UX.
+- **US7 (P2 uplift)**: Starts after US6 and adds richer issue metadata.
+- **US8 (P3 uplift)**: Starts after US7 to enable backlog and sprint planning.
+- **US9 (P4 uplift)**: Starts after US7 and integrates best after issue detail surfaces exist.
+- **US10 (P5 uplift)**: Starts after the uplift functionality is complete enough for final validation and docs.
 
 ### Within Each User Story
 
@@ -307,6 +424,11 @@ Task T067: Document smoke testing in infra/railway/smoke-test.md
 3. Add User Story 3 for dashboard summaries and progress visibility.
 4. Add User Story 4 for polished responsive UX.
 5. Add User Story 5 for Railway and submission completeness.
+6. Add User Story 6 for a work-first shell and project workspace.
+7. Add User Story 7 for richer issue metadata.
+8. Add User Story 8 for backlog and sprint planning.
+9. Add User Story 9 for comments and activity history.
+10. Add User Story 10 for upgraded-workspace hardening.
 
 ### Parallel Team Strategy
 
@@ -319,7 +441,7 @@ Task T067: Document smoke testing in infra/railway/smoke-test.md
 
 ## Task Summary
 
-- **Total tasks**: 79
+- **Total tasks**: 106
 - **Setup tasks**: 6
 - **Foundational tasks**: 14
 - **US1 Secure Team Workspace**: 17
@@ -328,6 +450,11 @@ Task T067: Document smoke testing in infra/railway/smoke-test.md
 - **US4 Responsive Polish**: 8
 - **US5 Live Submission**: 9
 - **Polish tasks**: 7
+- **US6 Work-First Workspace**: 6
+- **US7 Rich Issue Model**: 7
+- **US8 Backlog and Sprint Planning**: 6
+- **US9 Collaboration and Activity**: 4
+- **US10 Upgrade Hardening**: 4
 
 ## Independent Test Criteria
 

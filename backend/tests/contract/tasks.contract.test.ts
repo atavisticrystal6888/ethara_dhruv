@@ -27,13 +27,37 @@ describe("task REST contract", () => {
 
     const created = await admin
       .post(`/api/projects/${project.id}/tasks`)
-      .send({ title: "Draft demo", status: "TODO", assigneeId: memberUser.id, dueDate: "2026-05-20" })
+      .send({ title: "Draft demo", status: "TODO", assigneeId: memberUser.id, dueDate: "2099-05-20" })
       .expect(201);
 
     expect(created.body).toMatchObject({ title: "Draft demo", status: "TODO", isOverdue: false });
 
     await admin.get(`/api/projects/${project.id}/tasks`).expect(200);
-    await admin.get(`/api/projects/${project.id}/tasks/${created.body.id}`).expect(200);
+    const detail = await admin.get(`/api/projects/${project.id}/tasks/${created.body.id}`).expect(200);
+    expect(detail.body.comments).toEqual([]);
+    expect(detail.body.activity).toEqual([
+      expect.objectContaining({ type: "CREATED", message: "Created issue" })
+    ]);
+
+    const comment = await admin
+      .post(`/api/projects/${project.id}/tasks/${created.body.id}/comments`)
+      .send({ body: "Added the first review note" })
+      .expect(201);
+
+    expect(comment.body).toMatchObject({ body: "Added the first review note" });
+
+    const comments = await admin.get(`/api/projects/${project.id}/tasks/${created.body.id}/comments`).expect(200);
+    expect(comments.body).toHaveLength(1);
+    expect(comments.body[0]).toMatchObject({ body: "Added the first review note" });
+
+    const activity = await admin.get(`/api/projects/${project.id}/tasks/${created.body.id}/activity`).expect(200);
+    expect(activity.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "COMMENTED", message: "Added a comment" }),
+        expect.objectContaining({ type: "CREATED", message: "Created issue" })
+      ])
+    );
+
     await admin.patch(`/api/projects/${project.id}/tasks/${created.body.id}`).send({ status: "IN_PROGRESS" }).expect(200);
     await admin.delete(`/api/projects/${project.id}/tasks/${created.body.id}`).expect(204);
   });

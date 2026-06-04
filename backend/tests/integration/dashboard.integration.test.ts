@@ -20,7 +20,7 @@ describe("dashboard aggregation", () => {
     const project = await admin.post("/api/projects").send({ name: "Launch Plan" }).expect(201);
     await admin.post(`/api/projects/${project.body.id}/memberships`).send({ userId: memberSignup.body.user.id }).expect(201);
     await admin.post(`/api/projects/${project.body.id}/tasks`).send({ title: "Todo", status: "TODO", assigneeId: memberSignup.body.user.id, dueDate: "2020-01-01" }).expect(201);
-    await admin.post(`/api/projects/${project.body.id}/tasks`).send({ title: "Progress", status: "IN_PROGRESS", assigneeId: memberSignup.body.user.id, dueDate: "2026-05-20" }).expect(201);
+    await admin.post(`/api/projects/${project.body.id}/tasks`).send({ title: "Progress", status: "IN_PROGRESS", assigneeId: memberSignup.body.user.id, dueDate: "2099-05-20" }).expect(201);
     await admin.post(`/api/projects/${project.body.id}/tasks`).send({ title: "Done", status: "DONE", assigneeId: memberSignup.body.user.id, dueDate: "2020-01-01" }).expect(201);
 
     const dashboard = await admin.get("/api/dashboard").expect(200);

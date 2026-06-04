@@ -1,8 +1,8 @@
 ﻿import { randomUUID } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
 import { env } from "../config/env.js";
-import type { ProjectRole, RecurrencePattern, Role, TaskAssignmentType, TaskStatus } from "../types/domain.js";
-import type { DatabaseClient, DbMembership, DbProject, DbTask, DbUser } from "../types/database.js";
+import type { ProjectRole, RecurrencePattern, Role, SprintStatus, TaskActivityType, TaskAssignmentType, TaskIssueType, TaskPriority, TaskStatus } from "../types/domain.js";
+import type { DatabaseClient, DbMembership, DbProject, DbSprint, DbTask, DbTaskActivity, DbTaskComment, DbUser } from "../types/database.js";
 
 type Args = Record<string, unknown>;
 type Select = Record<string, boolean>;
@@ -90,6 +90,20 @@ function mapMembership(row: Record<string, unknown>): DbMembership {
   };
 }
 
+function mapSprint(row: Record<string, unknown>): DbSprint {
+  return {
+    id: String(row.id),
+    projectId: String(row.projectId),
+    name: String(row.name),
+    goal: (row.goal as string | null) ?? null,
+    status: row.status as SprintStatus,
+    startDate: row.startDate ? normalizeDate(row.startDate) : null,
+    endDate: row.endDate ? normalizeDate(row.endDate) : null,
+    createdAt: normalizeDate(row.createdAt),
+    updatedAt: normalizeDate(row.updatedAt)
+  };
+}
+
 function mapTask(row: Record<string, unknown>): DbTask {
   return {
     id: String(row.id),
@@ -97,11 +111,17 @@ function mapTask(row: Record<string, unknown>): DbTask {
     title: String(row.title),
     description: (row.description as string | null) ?? null,
     status: row.status as TaskStatus,
+    issueType: row.issueType as TaskIssueType,
+    priority: row.priority as TaskPriority,
     assignmentType: row.assignmentType as TaskAssignmentType,
     assigneeId: (row.assigneeId as string | null) ?? null,
     assigneeRole: (row.assigneeRole as ProjectRole | null) ?? null,
     createdById: String(row.createdById),
     dueDate: normalizeDate(row.dueDate),
+    sprintId: (row.sprintId as string | null) ?? null,
+    storyPoints: Number(row.storyPoints ?? 0),
+    labels: Array.isArray(row.labels) ? (row.labels as string[]) : [],
+    sortOrder: Number(row.sortOrder ?? 0),
     estimatedMinutes: Number(row.estimatedMinutes ?? 0),
     trackedMinutes: Number(row.trackedMinutes ?? 0),
     timerStartedAt: row.timerStartedAt ? normalizeDate(row.timerStartedAt) : null,
@@ -110,6 +130,28 @@ function mapTask(row: Record<string, unknown>): DbTask {
     recurrenceParentTaskId: (row.recurrenceParentTaskId as string | null) ?? null,
     createdAt: normalizeDate(row.createdAt),
     updatedAt: normalizeDate(row.updatedAt)
+  };
+}
+
+function mapTaskComment(row: Record<string, unknown>): DbTaskComment {
+  return {
+    id: String(row.id),
+    taskId: String(row.taskId),
+    authorId: String(row.authorId),
+    body: String(row.body),
+    createdAt: normalizeDate(row.createdAt),
+    updatedAt: normalizeDate(row.updatedAt)
+  };
+}
+
+function mapTaskActivity(row: Record<string, unknown>): DbTaskActivity {
+  return {
+    id: String(row.id),
+    taskId: String(row.taskId),
+    actorId: String(row.actorId),
+    type: row.type as TaskActivityType,
+    message: String(row.message),
+    createdAt: normalizeDate(row.createdAt)
   };
 }
 
@@ -170,6 +212,26 @@ async function ensureSchema() {
          WHEN duplicate_object THEN NULL;
        END $$;`,
       `DO $$ BEGIN
+         CREATE TYPE "TaskIssueType" AS ENUM ('EPIC', 'STORY', 'TASK', 'BUG');
+       EXCEPTION
+         WHEN duplicate_object THEN NULL;
+       END $$;`,
+      `DO $$ BEGIN
+         CREATE TYPE "TaskPriority" AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
+       EXCEPTION
+         WHEN duplicate_object THEN NULL;
+       END $$;`,
+      `DO $$ BEGIN
+         CREATE TYPE "SprintStatus" AS ENUM ('PLANNED', 'ACTIVE', 'COMPLETED');
+       EXCEPTION
+         WHEN duplicate_object THEN NULL;
+       END $$;`,
+      `DO $$ BEGIN
+         CREATE TYPE "TaskActivityType" AS ENUM ('CREATED', 'UPDATED', 'COMMENTED');
+       EXCEPTION
+         WHEN duplicate_object THEN NULL;
+       END $$;`,
+      `DO $$ BEGIN
          CREATE TYPE "TaskAssignmentType" AS ENUM ('USER', 'ROLE');
        EXCEPTION
          WHEN duplicate_object THEN NULL;
@@ -204,17 +266,34 @@ async function ensureSchema() {
          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
          UNIQUE ("projectId", "userId")
        );`,
+      `CREATE TABLE IF NOT EXISTS "Sprint" (
+        "id" TEXT PRIMARY KEY,
+        "projectId" TEXT NOT NULL REFERENCES "Project"("id") ON DELETE CASCADE,
+        "name" TEXT NOT NULL,
+        "goal" TEXT,
+        "status" "SprintStatus" NOT NULL DEFAULT 'PLANNED',
+        "startDate" TIMESTAMPTZ,
+        "endDate" TIMESTAMPTZ,
+        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+       );`,
       `CREATE TABLE IF NOT EXISTS "Task" (
          "id" TEXT PRIMARY KEY,
          "projectId" TEXT NOT NULL REFERENCES "Project"("id") ON DELETE CASCADE,
          "title" TEXT NOT NULL,
          "description" TEXT,
          "status" "TaskStatus" NOT NULL DEFAULT 'TODO',
+         "issueType" "TaskIssueType" NOT NULL DEFAULT 'TASK',
+         "priority" "TaskPriority" NOT NULL DEFAULT 'MEDIUM',
          "assignmentType" "TaskAssignmentType" NOT NULL DEFAULT 'USER',
          "assigneeId" TEXT REFERENCES "User"("id") ON DELETE RESTRICT,
          "assigneeRole" "ProjectRole",
          "createdById" TEXT NOT NULL REFERENCES "User"("id") ON DELETE RESTRICT,
          "dueDate" TIMESTAMPTZ NOT NULL,
+         "sprintId" TEXT REFERENCES "Sprint"("id") ON DELETE SET NULL,
+         "storyPoints" INTEGER NOT NULL DEFAULT 0,
+         "labels" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+         "sortOrder" BIGINT NOT NULL DEFAULT 0,
          "estimatedMinutes" INTEGER NOT NULL DEFAULT 0,
          "trackedMinutes" INTEGER NOT NULL DEFAULT 0,
          "timerStartedAt" TIMESTAMPTZ,
@@ -223,6 +302,22 @@ async function ensureSchema() {
          "recurrenceParentTaskId" TEXT REFERENCES "Task"("id") ON DELETE SET NULL,
          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
          "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+       );`,
+      `CREATE TABLE IF NOT EXISTS "TaskComment" (
+         "id" TEXT PRIMARY KEY,
+         "taskId" TEXT NOT NULL REFERENCES "Task"("id") ON DELETE CASCADE,
+         "authorId" TEXT NOT NULL REFERENCES "User"("id") ON DELETE RESTRICT,
+         "body" TEXT NOT NULL,
+         "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+         "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+       );`,
+      `CREATE TABLE IF NOT EXISTS "TaskActivity" (
+         "id" TEXT PRIMARY KEY,
+         "taskId" TEXT NOT NULL REFERENCES "Task"("id") ON DELETE CASCADE,
+         "actorId" TEXT NOT NULL REFERENCES "User"("id") ON DELETE RESTRICT,
+         "type" "TaskActivityType" NOT NULL,
+         "message" TEXT NOT NULL,
+         "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
        );`,
       `ALTER TABLE "Membership" ADD COLUMN IF NOT EXISTS "role" "ProjectRole" NOT NULL DEFAULT 'MEMBER';`,
       `UPDATE "Membership"
@@ -233,6 +328,13 @@ async function ensureSchema() {
       `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "assignmentType" "TaskAssignmentType" NOT NULL DEFAULT 'USER';`,
       `ALTER TABLE "Task" ALTER COLUMN "assigneeId" DROP NOT NULL;`,
       `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "assigneeRole" "ProjectRole";`,
+      `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "issueType" "TaskIssueType" NOT NULL DEFAULT 'TASK';`,
+      `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "priority" "TaskPriority" NOT NULL DEFAULT 'MEDIUM';`,
+      `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "sprintId" TEXT REFERENCES "Sprint"("id") ON DELETE SET NULL;`,
+      `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "storyPoints" INTEGER NOT NULL DEFAULT 0;`,
+      `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "labels" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];`,
+      `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "sortOrder" BIGINT NOT NULL DEFAULT 0;`,
+      `UPDATE "Task" SET "sortOrder" = FLOOR(EXTRACT(EPOCH FROM "createdAt") * 1000) WHERE "sortOrder" = 0;`,
       `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "estimatedMinutes" INTEGER NOT NULL DEFAULT 0;`,
       `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "trackedMinutes" INTEGER NOT NULL DEFAULT 0;`,
       `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "timerStartedAt" TIMESTAMPTZ;`,
@@ -242,13 +344,23 @@ async function ensureSchema() {
       `CREATE INDEX IF NOT EXISTS "Project_createdById_idx" ON "Project" ("createdById");`,
       `CREATE INDEX IF NOT EXISTS "Membership_userId_idx" ON "Membership" ("userId");`,
       `CREATE INDEX IF NOT EXISTS "Membership_role_idx" ON "Membership" ("role");`,
+      `CREATE INDEX IF NOT EXISTS "Sprint_projectId_idx" ON "Sprint" ("projectId");`,
+      `CREATE INDEX IF NOT EXISTS "Sprint_status_idx" ON "Sprint" ("status");`,
       `CREATE INDEX IF NOT EXISTS "Task_projectId_idx" ON "Task" ("projectId");`,
       `CREATE INDEX IF NOT EXISTS "Task_assigneeId_idx" ON "Task" ("assigneeId");`,
+      `CREATE INDEX IF NOT EXISTS "Task_sprintId_idx" ON "Task" ("sprintId");`,
       `CREATE INDEX IF NOT EXISTS "Task_status_idx" ON "Task" ("status");`,
+      `CREATE INDEX IF NOT EXISTS "Task_issueType_idx" ON "Task" ("issueType");`,
+      `CREATE INDEX IF NOT EXISTS "Task_priority_idx" ON "Task" ("priority");`,
       `CREATE INDEX IF NOT EXISTS "Task_dueDate_idx" ON "Task" ("dueDate");`,
       `CREATE INDEX IF NOT EXISTS "Task_assignmentType_idx" ON "Task" ("assignmentType");`,
       `CREATE INDEX IF NOT EXISTS "Task_recurrencePattern_idx" ON "Task" ("recurrencePattern");`,
-      `CREATE INDEX IF NOT EXISTS "Task_timerUserId_idx" ON "Task" ("timerUserId");`
+      `CREATE INDEX IF NOT EXISTS "Task_timerUserId_idx" ON "Task" ("timerUserId");`,
+      `CREATE INDEX IF NOT EXISTS "TaskComment_taskId_idx" ON "TaskComment" ("taskId");`,
+      `CREATE INDEX IF NOT EXISTS "TaskComment_authorId_idx" ON "TaskComment" ("authorId");`,
+      `CREATE INDEX IF NOT EXISTS "TaskActivity_taskId_idx" ON "TaskActivity" ("taskId");`,
+      `CREATE INDEX IF NOT EXISTS "TaskActivity_actorId_idx" ON "TaskActivity" ("actorId");`,
+      `CREATE INDEX IF NOT EXISTS "TaskActivity_type_idx" ON "TaskActivity" ("type");`
     ];
 
     for (const statement of statements) {
@@ -294,13 +406,25 @@ async function getMembershipsByProjectId(db: Queryable, projectId: string) {
   return rows.map(mapMembership);
 }
 
-async function getTasksByProjectId(db: Queryable, projectId: string, direction: "asc" | "desc" = "desc") {
+async function getSprintsByProjectId(db: Queryable, projectId: string, direction: "asc" | "desc" = "desc") {
   const rows = await queryRows<Record<string, unknown>>(
     db,
-    `SELECT "id", "projectId", "title", "description", "status", "assignmentType", "assigneeId", "assigneeRole", "createdById", "dueDate", "estimatedMinutes", "trackedMinutes", "timerStartedAt", "timerUserId", "recurrencePattern", "recurrenceParentTaskId", "createdAt", "updatedAt"
-     FROM "Task"
+    `SELECT "id", "projectId", "name", "goal", "status", "startDate", "endDate", "createdAt", "updatedAt"
+     FROM "Sprint"
      WHERE "projectId" = $1
      ORDER BY "createdAt" ${direction.toUpperCase()}`,
+    [projectId]
+  );
+  return rows.map(mapSprint);
+}
+
+async function getTasksByProjectId(db: Queryable, projectId: string, order: { field: "createdAt" | "sortOrder"; direction: "asc" | "desc" } = { field: "createdAt", direction: "desc" }) {
+  const rows = await queryRows<Record<string, unknown>>(
+    db,
+    `SELECT "id", "projectId", "title", "description", "status", "issueType", "priority", "assignmentType", "assigneeId", "assigneeRole", "createdById", "dueDate", "sprintId", "storyPoints", "labels", "sortOrder", "estimatedMinutes", "trackedMinutes", "timerStartedAt", "timerUserId", "recurrencePattern", "recurrenceParentTaskId", "createdAt", "updatedAt"
+     FROM "Task"
+     WHERE "projectId" = $1
+     ORDER BY "${order.field}" ${order.direction.toUpperCase()}`,
     [projectId]
   );
   return rows.map(mapTask);
@@ -343,6 +467,30 @@ async function taskWithInclude(db: Queryable, task: DbTask, include?: Args) {
   };
 }
 
+async function taskCommentWithInclude(db: Queryable, comment: DbTaskComment, include?: Args) {
+  if (!include) {
+    return comment;
+  }
+
+  const authorInclude = include.author as { select?: Select } | undefined;
+  return {
+    ...comment,
+    ...(authorInclude ? { author: await publicUser(db, comment.authorId, authorInclude.select) } : {})
+  };
+}
+
+async function taskActivityWithInclude(db: Queryable, activity: DbTaskActivity, include?: Args) {
+  if (!include) {
+    return activity;
+  }
+
+  const actorInclude = include.actor as { select?: Select } | undefined;
+  return {
+    ...activity,
+    ...(actorInclude ? { actor: await publicUser(db, activity.actorId, actorInclude.select) } : {})
+  };
+}
+
 async function projectWithInclude(db: Queryable, project: DbProject, include?: Args) {
   if (!include) {
     return project;
@@ -358,11 +506,18 @@ async function projectWithInclude(db: Queryable, project: DbProject, include?: A
     );
   }
 
+  if (include.sprints) {
+    const sprintConfig = include.sprints as { orderBy?: { createdAt?: "asc" | "desc" } };
+    result.sprints = await getSprintsByProjectId(db, project.id, sprintConfig.orderBy?.createdAt ?? "desc");
+  }
+
   if (include.tasks) {
     const taskInclude = include.tasks;
-    const taskConfig = taskInclude === true ? undefined : (taskInclude as { include?: Args; orderBy?: { createdAt?: "asc" | "desc" } });
-    const direction = taskConfig?.orderBy?.createdAt ?? "desc";
-    const tasks = await getTasksByProjectId(db, project.id, direction);
+    const taskConfig = taskInclude === true ? undefined : (taskInclude as { include?: Args; orderBy?: { createdAt?: "asc" | "desc"; sortOrder?: "asc" | "desc" } });
+    const order = taskConfig?.orderBy?.sortOrder
+      ? { field: "sortOrder" as const, direction: taskConfig.orderBy.sortOrder }
+      : { field: "createdAt" as const, direction: taskConfig?.orderBy?.createdAt ?? "desc" };
+    const tasks = await getTasksByProjectId(db, project.id, order);
     result.tasks = taskInclude === true ? tasks : await Promise.all(tasks.map((task) => taskWithInclude(db, task, taskConfig?.include)));
   }
 
@@ -399,6 +554,13 @@ function buildTaskWhere(where?: Args) {
     conditions.push(`"assigneeId" = $${values.length}`);
   }
 
+  if (where.sprintId === null) {
+    conditions.push(`"sprintId" IS NULL`);
+  } else if (typeof where.sprintId === "string") {
+    values.push(where.sprintId);
+    conditions.push(`"sprintId" = $${values.length}`);
+  }
+
   if (where.recurrenceParentTaskId) {
     values.push(where.recurrenceParentTaskId);
     conditions.push(`"recurrenceParentTaskId" = $${values.length}`);
@@ -411,6 +573,88 @@ function buildTaskWhere(where?: Args) {
   } else if (status?.in?.length) {
     values.push(status.in);
     conditions.push(`"status" = ANY($${values.length}::"TaskStatus"[])`);
+  }
+
+  return {
+    clause: conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "",
+    values
+  };
+}
+
+function buildSprintWhere(where?: Args) {
+  const conditions: string[] = [];
+  const values: unknown[] = [];
+
+  if (!where) {
+    return { clause: "", values };
+  }
+
+  if (where.id) {
+    values.push(where.id);
+    conditions.push(`"id" = $${values.length}`);
+  }
+
+  if (where.projectId) {
+    values.push(where.projectId);
+    conditions.push(`"projectId" = $${values.length}`);
+  }
+
+  if (where.status) {
+    values.push(where.status);
+    conditions.push(`"status" = $${values.length}::"SprintStatus"`);
+  }
+
+  return {
+    clause: conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "",
+    values
+  };
+}
+
+function buildTaskCommentWhere(where?: Args) {
+  const conditions: string[] = [];
+  const values: unknown[] = [];
+
+  if (!where) {
+    return { clause: "", values };
+  }
+
+  if (where.id) {
+    values.push(where.id);
+    conditions.push(`"id" = $${values.length}`);
+  }
+
+  if (where.taskId) {
+    values.push(where.taskId);
+    conditions.push(`"taskId" = $${values.length}`);
+  }
+
+  return {
+    clause: conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "",
+    values
+  };
+}
+
+function buildTaskActivityWhere(where?: Args) {
+  const conditions: string[] = [];
+  const values: unknown[] = [];
+
+  if (!where) {
+    return { clause: "", values };
+  }
+
+  if (where.id) {
+    values.push(where.id);
+    conditions.push(`"id" = $${values.length}`);
+  }
+
+  if (where.taskId) {
+    values.push(where.taskId);
+    conditions.push(`"taskId" = $${values.length}`);
+  }
+
+  if (where.type) {
+    values.push(where.type);
+    conditions.push(`"type" = $${values.length}::"TaskActivityType"`);
   }
 
   return {
@@ -762,6 +1006,346 @@ export async function createPostgresDatabase(): Promise<DatabaseClient> {
         return membershipWithInclude(getPool(), mapMembership(row), args.include as Args | undefined);
       }
     },
+    sprint: {
+      async count(args = {}) {
+        const where = buildSprintWhere(args.where as Args | undefined);
+        const row = await queryOne<{ count: number }>(getPool(), `SELECT COUNT(*)::int AS "count" FROM "Sprint"${where.clause}`, where.values);
+        return row ? Number(row.count) : 0;
+      },
+      async create(args) {
+        const data = args.data as { projectId: string; name: string; goal?: string | null; status?: SprintStatus; startDate?: Date | null; endDate?: Date | null };
+        const createdAt = new Date();
+        const row = await queryOne<Record<string, unknown>>(
+          getPool(),
+          `INSERT INTO "Sprint" ("id", "projectId", "name", "goal", "status", "startDate", "endDate", "createdAt", "updatedAt")
+           VALUES ($1, $2, $3, $4, $5::"SprintStatus", $6, $7, $8, $9)
+           RETURNING "id", "projectId", "name", "goal", "status", "startDate", "endDate", "createdAt", "updatedAt"`,
+          [randomUUID(), data.projectId, data.name, data.goal ?? null, data.status ?? "PLANNED", data.startDate ?? null, data.endDate ?? null, createdAt, createdAt]
+        );
+
+        if (!row) {
+          throw new Error("Failed to create sprint");
+        }
+
+        return mapSprint(row);
+      },
+      async delete(args) {
+        const id = (args.where as { id: string }).id;
+        await execute(getPool(), 'DELETE FROM "Sprint" WHERE "id" = $1', [id]);
+        return {};
+      },
+      async deleteMany() {
+        const count = await execute(getPool(), 'DELETE FROM "Sprint"');
+        return { count };
+      },
+      async findFirst(args) {
+        const where = buildSprintWhere(args.where as Args | undefined);
+        const row = await queryOne<Record<string, unknown>>(
+          getPool(),
+          `SELECT "id", "projectId", "name", "goal", "status", "startDate", "endDate", "createdAt", "updatedAt"
+           FROM "Sprint"
+           ${where.clause}
+           ORDER BY "createdAt" DESC
+           LIMIT 1`,
+          where.values
+        );
+        return row ? mapSprint(row) : null;
+      },
+      async findMany(args = {}) {
+        const where = buildSprintWhere(args.where as Args | undefined);
+        const direction = ((args.orderBy as { createdAt?: "asc" | "desc" } | undefined)?.createdAt ?? "desc").toUpperCase();
+        const rows = await queryRows<Record<string, unknown>>(
+          getPool(),
+          `SELECT "id", "projectId", "name", "goal", "status", "startDate", "endDate", "createdAt", "updatedAt"
+           FROM "Sprint"
+           ${where.clause}
+           ORDER BY "createdAt" ${direction}`,
+          where.values
+        );
+        return rows.map(mapSprint);
+      },
+      async findUnique(args) {
+        const id = (args.where as { id: string }).id;
+        const row = await queryOne<Record<string, unknown>>(
+          getPool(),
+          'SELECT "id", "projectId", "name", "goal", "status", "startDate", "endDate", "createdAt", "updatedAt" FROM "Sprint" WHERE "id" = $1',
+          [id]
+        );
+        return row ? mapSprint(row) : null;
+      },
+      async findUniqueOrThrow(args) {
+        const sprint = await this.findUnique(args);
+        if (!sprint) {
+          throw new Error("Sprint not found");
+        }
+        return sprint;
+      },
+      async update(args) {
+        const id = (args.where as { id: string }).id;
+        const data = args.data as { name?: string; goal?: string | null; status?: SprintStatus; startDate?: Date | null; endDate?: Date | null };
+        const values: unknown[] = [];
+        const updates: string[] = [];
+
+        if (data.name !== undefined) {
+          values.push(data.name);
+          updates.push(`"name" = $${values.length}`);
+        }
+
+        if (data.goal !== undefined) {
+          values.push(data.goal);
+          updates.push(`"goal" = $${values.length}`);
+        }
+
+        if (data.status !== undefined) {
+          values.push(data.status);
+          updates.push(`"status" = $${values.length}::"SprintStatus"`);
+        }
+
+        if (data.startDate !== undefined) {
+          values.push(data.startDate);
+          updates.push(`"startDate" = $${values.length}`);
+        }
+
+        if (data.endDate !== undefined) {
+          values.push(data.endDate);
+          updates.push(`"endDate" = $${values.length}`);
+        }
+
+        values.push(new Date());
+        updates.push(`"updatedAt" = $${values.length}`);
+        values.push(id);
+
+        const row = await queryOne<Record<string, unknown>>(
+          getPool(),
+          `UPDATE "Sprint"
+           SET ${updates.join(", ")}
+           WHERE "id" = $${values.length}
+           RETURNING "id", "projectId", "name", "goal", "status", "startDate", "endDate", "createdAt", "updatedAt"`,
+          values
+        );
+
+        if (!row) {
+          throw new Error("Sprint not found");
+        }
+
+        return mapSprint(row);
+      }
+    },
+    taskComment: {
+      async count(args = {}) {
+        const where = buildTaskCommentWhere(args.where as Args | undefined);
+        const row = await queryOne<{ count: number }>(getPool(), `SELECT COUNT(*)::int AS "count" FROM "TaskComment"${where.clause}`, where.values);
+        return row ? Number(row.count) : 0;
+      },
+      async create(args) {
+        const data = args.data as { taskId: string; authorId: string; body: string };
+        const createdAt = new Date();
+        const row = await queryOne<Record<string, unknown>>(
+          getPool(),
+          `INSERT INTO "TaskComment" ("id", "taskId", "authorId", "body", "createdAt", "updatedAt")
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING "id", "taskId", "authorId", "body", "createdAt", "updatedAt"`,
+          [randomUUID(), data.taskId, data.authorId, data.body, createdAt, createdAt]
+        );
+
+        if (!row) {
+          throw new Error("Failed to create task comment");
+        }
+
+        return taskCommentWithInclude(getPool(), mapTaskComment(row), args.include as Args | undefined);
+      },
+      async delete(args) {
+        const id = (args.where as { id: string }).id;
+        await execute(getPool(), 'DELETE FROM "TaskComment" WHERE "id" = $1', [id]);
+        return {};
+      },
+      async deleteMany(args = {}) {
+        const where = buildTaskCommentWhere(args.where as Args | undefined);
+        const count = await execute(getPool(), `DELETE FROM "TaskComment"${where.clause}`, where.values);
+        return { count };
+      },
+      async findFirst(args) {
+        const where = buildTaskCommentWhere(args.where as Args | undefined);
+        const row = await queryOne<Record<string, unknown>>(
+          getPool(),
+          `SELECT "id", "taskId", "authorId", "body", "createdAt", "updatedAt"
+           FROM "TaskComment"
+           ${where.clause}
+           ORDER BY "createdAt" ASC
+           LIMIT 1`,
+          where.values
+        );
+        return row ? taskCommentWithInclude(getPool(), mapTaskComment(row), args.include as Args | undefined) : null;
+      },
+      async findMany(args = {}) {
+        const where = buildTaskCommentWhere(args.where as Args | undefined);
+        const direction = ((args.orderBy as { createdAt?: "asc" | "desc" } | undefined)?.createdAt ?? "asc").toUpperCase();
+        const rows = await queryRows<Record<string, unknown>>(
+          getPool(),
+          `SELECT "id", "taskId", "authorId", "body", "createdAt", "updatedAt"
+           FROM "TaskComment"
+           ${where.clause}
+           ORDER BY "createdAt" ${direction}`,
+          where.values
+        );
+        return Promise.all(rows.map((row) => taskCommentWithInclude(getPool(), mapTaskComment(row), args.include as Args | undefined)));
+      },
+      async findUnique(args) {
+        const id = (args.where as { id: string }).id;
+        const row = await queryOne<Record<string, unknown>>(
+          getPool(),
+          'SELECT "id", "taskId", "authorId", "body", "createdAt", "updatedAt" FROM "TaskComment" WHERE "id" = $1',
+          [id]
+        );
+        return row ? taskCommentWithInclude(getPool(), mapTaskComment(row), args.include as Args | undefined) : null;
+      },
+      async findUniqueOrThrow(args) {
+        const comment = await this.findUnique(args);
+        if (!comment) {
+          throw new Error("Task comment not found");
+        }
+        return comment;
+      },
+      async update(args) {
+        const id = (args.where as { id: string }).id;
+        const data = args.data as { body?: string };
+        const values: unknown[] = [];
+        const updates: string[] = [];
+
+        if (data.body !== undefined) {
+          values.push(data.body);
+          updates.push(`"body" = $${values.length}`);
+        }
+
+        values.push(new Date());
+        updates.push(`"updatedAt" = $${values.length}`);
+        values.push(id);
+
+        const row = await queryOne<Record<string, unknown>>(
+          getPool(),
+          `UPDATE "TaskComment"
+           SET ${updates.join(", ")}
+           WHERE "id" = $${values.length}
+           RETURNING "id", "taskId", "authorId", "body", "createdAt", "updatedAt"`,
+          values
+        );
+
+        if (!row) {
+          throw new Error("Task comment not found");
+        }
+
+        return taskCommentWithInclude(getPool(), mapTaskComment(row), args.include as Args | undefined);
+      }
+    },
+    taskActivity: {
+      async count(args = {}) {
+        const where = buildTaskActivityWhere(args.where as Args | undefined);
+        const row = await queryOne<{ count: number }>(getPool(), `SELECT COUNT(*)::int AS "count" FROM "TaskActivity"${where.clause}`, where.values);
+        return row ? Number(row.count) : 0;
+      },
+      async create(args) {
+        const data = args.data as { taskId: string; actorId: string; type: TaskActivityType; message: string };
+        const createdAt = new Date();
+        const row = await queryOne<Record<string, unknown>>(
+          getPool(),
+          `INSERT INTO "TaskActivity" ("id", "taskId", "actorId", "type", "message", "createdAt")
+           VALUES ($1, $2, $3, $4::"TaskActivityType", $5, $6)
+           RETURNING "id", "taskId", "actorId", "type", "message", "createdAt"`,
+          [randomUUID(), data.taskId, data.actorId, data.type, data.message, createdAt]
+        );
+
+        if (!row) {
+          throw new Error("Failed to create task activity");
+        }
+
+        return taskActivityWithInclude(getPool(), mapTaskActivity(row), args.include as Args | undefined);
+      },
+      async delete(args) {
+        const id = (args.where as { id: string }).id;
+        await execute(getPool(), 'DELETE FROM "TaskActivity" WHERE "id" = $1', [id]);
+        return {};
+      },
+      async deleteMany(args = {}) {
+        const where = buildTaskActivityWhere(args.where as Args | undefined);
+        const count = await execute(getPool(), `DELETE FROM "TaskActivity"${where.clause}`, where.values);
+        return { count };
+      },
+      async findFirst(args) {
+        const where = buildTaskActivityWhere(args.where as Args | undefined);
+        const row = await queryOne<Record<string, unknown>>(
+          getPool(),
+          `SELECT "id", "taskId", "actorId", "type", "message", "createdAt"
+           FROM "TaskActivity"
+           ${where.clause}
+           ORDER BY "createdAt" DESC
+           LIMIT 1`,
+          where.values
+        );
+        return row ? taskActivityWithInclude(getPool(), mapTaskActivity(row), args.include as Args | undefined) : null;
+      },
+      async findMany(args = {}) {
+        const where = buildTaskActivityWhere(args.where as Args | undefined);
+        const direction = ((args.orderBy as { createdAt?: "asc" | "desc" } | undefined)?.createdAt ?? "desc").toUpperCase();
+        const rows = await queryRows<Record<string, unknown>>(
+          getPool(),
+          `SELECT "id", "taskId", "actorId", "type", "message", "createdAt"
+           FROM "TaskActivity"
+           ${where.clause}
+           ORDER BY "createdAt" ${direction}`,
+          where.values
+        );
+        return Promise.all(rows.map((row) => taskActivityWithInclude(getPool(), mapTaskActivity(row), args.include as Args | undefined)));
+      },
+      async findUnique(args) {
+        const id = (args.where as { id: string }).id;
+        const row = await queryOne<Record<string, unknown>>(
+          getPool(),
+          'SELECT "id", "taskId", "actorId", "type", "message", "createdAt" FROM "TaskActivity" WHERE "id" = $1',
+          [id]
+        );
+        return row ? taskActivityWithInclude(getPool(), mapTaskActivity(row), args.include as Args | undefined) : null;
+      },
+      async findUniqueOrThrow(args) {
+        const activity = await this.findUnique(args);
+        if (!activity) {
+          throw new Error("Task activity not found");
+        }
+        return activity;
+      },
+      async update(args) {
+        const id = (args.where as { id: string }).id;
+        const data = args.data as { message?: string; type?: TaskActivityType };
+        const values: unknown[] = [];
+        const updates: string[] = [];
+
+        if (data.message !== undefined) {
+          values.push(data.message);
+          updates.push(`"message" = $${values.length}`);
+        }
+
+        if (data.type !== undefined) {
+          values.push(data.type);
+          updates.push(`"type" = $${values.length}::"TaskActivityType"`);
+        }
+
+        values.push(id);
+
+        const row = await queryOne<Record<string, unknown>>(
+          getPool(),
+          `UPDATE "TaskActivity"
+           SET ${updates.join(", ")}
+           WHERE "id" = $${values.length}
+           RETURNING "id", "taskId", "actorId", "type", "message", "createdAt"`,
+          values
+        );
+
+        if (!row) {
+          throw new Error("Task activity not found");
+        }
+
+        return taskActivityWithInclude(getPool(), mapTaskActivity(row), args.include as Args | undefined);
+      }
+    },
     task: {
       async count(args = {}) {
         const where = buildTaskWhere(args.where as Args | undefined);
@@ -778,11 +1362,17 @@ export async function createPostgresDatabase(): Promise<DatabaseClient> {
           title: string;
           description?: string | null;
           status: TaskStatus;
+          issueType?: TaskIssueType;
+          priority?: TaskPriority;
           assignmentType: TaskAssignmentType;
           assigneeId?: string | null;
           assigneeRole?: ProjectRole | null;
           createdById: string;
           dueDate: Date;
+          sprintId?: string | null;
+          storyPoints?: number;
+          labels?: string[];
+          sortOrder?: number;
           estimatedMinutes?: number;
           trackedMinutes?: number;
           timerStartedAt?: Date | null;
@@ -794,20 +1384,26 @@ export async function createPostgresDatabase(): Promise<DatabaseClient> {
 
         const row = await queryOne<Record<string, unknown>>(
           getPool(),
-          `INSERT INTO "Task" ("id", "projectId", "title", "description", "status", "assignmentType", "assigneeId", "assigneeRole", "createdById", "dueDate", "estimatedMinutes", "trackedMinutes", "timerStartedAt", "timerUserId", "recurrencePattern", "recurrenceParentTaskId", "createdAt", "updatedAt")
-           VALUES ($1, $2, $3, $4, $5::"TaskStatus", $6::"TaskAssignmentType", $7, $8::"ProjectRole", $9, $10, $11, $12, $13, $14, $15::"RecurrencePattern", $16, $17, $18)
-           RETURNING "id", "projectId", "title", "description", "status", "assignmentType", "assigneeId", "assigneeRole", "createdById", "dueDate", "estimatedMinutes", "trackedMinutes", "timerStartedAt", "timerUserId", "recurrencePattern", "recurrenceParentTaskId", "createdAt", "updatedAt"`,
+          `INSERT INTO "Task" ("id", "projectId", "title", "description", "status", "issueType", "priority", "assignmentType", "assigneeId", "assigneeRole", "createdById", "dueDate", "sprintId", "storyPoints", "labels", "sortOrder", "estimatedMinutes", "trackedMinutes", "timerStartedAt", "timerUserId", "recurrencePattern", "recurrenceParentTaskId", "createdAt", "updatedAt")
+           VALUES ($1, $2, $3, $4, $5::"TaskStatus", $6::"TaskIssueType", $7::"TaskPriority", $8::"TaskAssignmentType", $9, $10::"ProjectRole", $11, $12, $13, $14, $15::TEXT[], $16, $17, $18, $19, $20, $21::"RecurrencePattern", $22, $23, $24)
+           RETURNING "id", "projectId", "title", "description", "status", "issueType", "priority", "assignmentType", "assigneeId", "assigneeRole", "createdById", "dueDate", "sprintId", "storyPoints", "labels", "sortOrder", "estimatedMinutes", "trackedMinutes", "timerStartedAt", "timerUserId", "recurrencePattern", "recurrenceParentTaskId", "createdAt", "updatedAt"`,
           [
             randomUUID(),
             data.projectId,
             data.title,
             data.description ?? null,
             data.status,
+            data.issueType ?? "TASK",
+            data.priority ?? "MEDIUM",
             data.assignmentType,
             data.assigneeId ?? null,
             data.assigneeRole ?? null,
             data.createdById,
             data.dueDate,
+            data.sprintId ?? null,
+            data.storyPoints ?? 0,
+            data.labels ?? [],
+            data.sortOrder ?? Date.now(),
             data.estimatedMinutes ?? 0,
             data.trackedMinutes ?? 0,
             data.timerStartedAt ?? null,
@@ -838,7 +1434,7 @@ export async function createPostgresDatabase(): Promise<DatabaseClient> {
         const where = buildTaskWhere(args.where as Args | undefined);
         const row = await queryOne<Record<string, unknown>>(
           getPool(),
-          `SELECT "id", "projectId", "title", "description", "status", "assignmentType", "assigneeId", "assigneeRole", "createdById", "dueDate", "estimatedMinutes", "trackedMinutes", "timerStartedAt", "timerUserId", "recurrencePattern", "recurrenceParentTaskId", "createdAt", "updatedAt"
+          `SELECT "id", "projectId", "title", "description", "status", "issueType", "priority", "assignmentType", "assigneeId", "assigneeRole", "createdById", "dueDate", "sprintId", "storyPoints", "labels", "sortOrder", "estimatedMinutes", "trackedMinutes", "timerStartedAt", "timerUserId", "recurrencePattern", "recurrenceParentTaskId", "createdAt", "updatedAt"
            FROM "Task"
            ${where.clause}
            ORDER BY "createdAt" DESC
@@ -857,7 +1453,7 @@ export async function createPostgresDatabase(): Promise<DatabaseClient> {
         const direction = ((args.orderBy as { createdAt?: "asc" | "desc" } | undefined)?.createdAt ?? "desc").toUpperCase();
         const rows = await queryRows<Record<string, unknown>>(
           getPool(),
-          `SELECT "id", "projectId", "title", "description", "status", "assignmentType", "assigneeId", "assigneeRole", "createdById", "dueDate", "estimatedMinutes", "trackedMinutes", "timerStartedAt", "timerUserId", "recurrencePattern", "recurrenceParentTaskId", "createdAt", "updatedAt"
+          `SELECT "id", "projectId", "title", "description", "status", "issueType", "priority", "assignmentType", "assigneeId", "assigneeRole", "createdById", "dueDate", "sprintId", "storyPoints", "labels", "sortOrder", "estimatedMinutes", "trackedMinutes", "timerStartedAt", "timerUserId", "recurrencePattern", "recurrenceParentTaskId", "createdAt", "updatedAt"
            FROM "Task"
            ${where.clause}
            ORDER BY "createdAt" ${direction}`,
@@ -870,7 +1466,7 @@ export async function createPostgresDatabase(): Promise<DatabaseClient> {
         const id = (args.where as { id: string }).id;
         const row = await queryOne<Record<string, unknown>>(
           getPool(),
-          'SELECT "id", "projectId", "title", "description", "status", "assignmentType", "assigneeId", "assigneeRole", "createdById", "dueDate", "estimatedMinutes", "trackedMinutes", "timerStartedAt", "timerUserId", "recurrencePattern", "recurrenceParentTaskId", "createdAt", "updatedAt" FROM "Task" WHERE "id" = $1',
+          'SELECT "id", "projectId", "title", "description", "status", "issueType", "priority", "assignmentType", "assigneeId", "assigneeRole", "createdById", "dueDate", "sprintId", "storyPoints", "labels", "sortOrder", "estimatedMinutes", "trackedMinutes", "timerStartedAt", "timerUserId", "recurrencePattern", "recurrenceParentTaskId", "createdAt", "updatedAt" FROM "Task" WHERE "id" = $1',
           [id]
         );
 
@@ -893,10 +1489,16 @@ export async function createPostgresDatabase(): Promise<DatabaseClient> {
           title?: string;
           description?: string | null;
           status?: TaskStatus;
+          issueType?: TaskIssueType;
+          priority?: TaskPriority;
           assignmentType?: TaskAssignmentType;
           assigneeId?: string | null;
           assigneeRole?: ProjectRole | null;
           dueDate?: Date;
+          sprintId?: string | null;
+          storyPoints?: number;
+          labels?: string[];
+          sortOrder?: number;
           estimatedMinutes?: number;
           trackedMinutes?: number;
           timerStartedAt?: Date | null;
@@ -921,6 +1523,16 @@ export async function createPostgresDatabase(): Promise<DatabaseClient> {
           updates.push(`"status" = $${values.length}::"TaskStatus"`);
         }
 
+        if (data.issueType !== undefined) {
+          values.push(data.issueType);
+          updates.push(`"issueType" = $${values.length}::"TaskIssueType"`);
+        }
+
+        if (data.priority !== undefined) {
+          values.push(data.priority);
+          updates.push(`"priority" = $${values.length}::"TaskPriority"`);
+        }
+
         if (data.assignmentType !== undefined) {
           values.push(data.assignmentType);
           updates.push(`"assignmentType" = $${values.length}::"TaskAssignmentType"`);
@@ -939,6 +1551,26 @@ export async function createPostgresDatabase(): Promise<DatabaseClient> {
         if (data.dueDate !== undefined) {
           values.push(data.dueDate);
           updates.push(`"dueDate" = $${values.length}`);
+        }
+
+        if (data.sprintId !== undefined) {
+          values.push(data.sprintId);
+          updates.push(`"sprintId" = $${values.length}`);
+        }
+
+        if (data.storyPoints !== undefined) {
+          values.push(data.storyPoints);
+          updates.push(`"storyPoints" = $${values.length}`);
+        }
+
+        if (data.labels !== undefined) {
+          values.push(data.labels);
+          updates.push(`"labels" = $${values.length}::TEXT[]`);
+        }
+
+        if (data.sortOrder !== undefined) {
+          values.push(data.sortOrder);
+          updates.push(`"sortOrder" = $${values.length}`);
         }
 
         if (data.estimatedMinutes !== undefined) {
@@ -975,7 +1607,7 @@ export async function createPostgresDatabase(): Promise<DatabaseClient> {
           `UPDATE "Task"
            SET ${updates.join(", ")}
            WHERE "id" = $${values.length}
-           RETURNING "id", "projectId", "title", "description", "status", "assignmentType", "assigneeId", "assigneeRole", "createdById", "dueDate", "estimatedMinutes", "trackedMinutes", "timerStartedAt", "timerUserId", "recurrencePattern", "recurrenceParentTaskId", "createdAt", "updatedAt"`,
+           RETURNING "id", "projectId", "title", "description", "status", "issueType", "priority", "assignmentType", "assigneeId", "assigneeRole", "createdById", "dueDate", "sprintId", "storyPoints", "labels", "sortOrder", "estimatedMinutes", "trackedMinutes", "timerStartedAt", "timerUserId", "recurrencePattern", "recurrenceParentTaskId", "createdAt", "updatedAt"`,
           values
         );
 

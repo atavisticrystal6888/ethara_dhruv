@@ -22,13 +22,28 @@ Target length: 2 to 5 minutes.
 
 ## Task Flow
 
-- As Admin, create tasks with different statuses and due dates.
+- As Admin, create issues with different types, priorities, and due dates.
 - Assign at least one task to the Member.
 - Show validation behavior for a missing or invalid required task field.
 - As Member, update the assigned task status.
 
+## Workspace And Planning Flow
+
+- Open a project and show the Summary, Board, Backlog, and Team tabs.
+- Use the board toolbar to filter by status, issue type, priority, sprint, and assignee.
+- In Backlog, create a sprint, move work into it, and reorder backlog items.
+
+## Collaboration Flow
+
+- Open an issue detail panel from the board or backlog.
+- Add a comment and show the activity history updating after a status change or planning action.
+
+## Personal Work Surface
+
+- Open `Your Work` and show the current user's queue, role-delegated work, and any active timers.
+
 ## Dashboard And Submission Proof
 
-- Show dashboard totals, status breakdowns, assigned work, and overdue count.
+- Show dashboard totals, status breakdowns, assigned work, overdue count, and the new work-first CTA into `Your Work`.
 - Open the README and point to local setup, environment variables, Railway deployment steps, live URL, and demo video link.
 - Show `/api/health` on the deployed backend.

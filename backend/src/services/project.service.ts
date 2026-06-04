@@ -11,6 +11,9 @@ const projectInclude = {
       user: { select: { id: true, name: true, email: true, role: true, createdAt: true } }
     }
   },
+  sprints: {
+    orderBy: { createdAt: "desc" as const }
+  },
   tasks: {
     include: {
       assignee: { select: { id: true, name: true, email: true, role: true, createdAt: true } },
